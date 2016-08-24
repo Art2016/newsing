@@ -13,9 +13,13 @@ var RedisStore = require('connect-redis')(session);
 var auth = require('./routes/auth');
 var user = require('./routes/user');
 var newscontents = require('./routes/newscontents');
+var scrap = require('./routes/scrap');
+var search = require('./routes/search');
+var keyword = require('./routes/keyword');
+var follow = require('./routes/follow');
+var notification = require('./routes/notification');
 
 var app = express();
-
 
 // uncomment after placing your favicon in /public
 //app.use(favicon(path.join(__dirname, 'public', 'favicon.ico')));
@@ -35,13 +39,18 @@ app.use(session({
 }));
 app.use(passport.initialize());
 app.use(passport.session());
-app.use(express.static(path.join(__dirname, 'public')));
+app.use('/', express.static(path.join(__dirname, 'public')));
 // TODO: 이미지 디렉토리 구조 정의 필요
 //app.use('/images', express.static(path.join(__dirname, 'upload/images')));
 
 app.use('/', auth);
-app.use('/user', user);
+app.use('/users', user);
 app.use('/newscontents', newscontents);
+app.use('/scraps', scrap);
+app.use('/search', search);
+app.use('/keywords', keyword);
+app.use('/follows', follow);
+app.use('/notifications', notification);
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {
