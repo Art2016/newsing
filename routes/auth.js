@@ -1,37 +1,26 @@
 var express = require('express');
 var router = express.Router();
 var passport = require('passport');
-var LocalStrategy = require('passport-local').Strategy;
 var FacebookTokenStrategy = require('passport-facebook-token');
 var User = require('../models/user');
-
-passport.use(new LocalStrategy({usernameField: 'email', passwordField: 'password'}, function(email, password, done) {
-  var user = {
-    email: email,
-    password: password
-  };
-  done(null, user);
-}));
+var isSecure = require('./common').isSecure;
 
 // 페이스북 전략
 passport.use(new FacebookTokenStrategy({
     clientID: process.env.FACEBOOK_APP_ID,
     clientSecret: process.env.FACEBOOK_APP_SECRET
   }, function(accessToken, refreshToken, profile, done) {
-    // user 모델에서 findOrCreate
-    console.log(profile);
-    User.findOrCreate(profile, function (err, id) {
+    User.findOrCreate(profile, function (err, user) {
       if (err) {
-        console.log(err);
         return done(err);
       }
-      return done(null, id);
+      return done(null, user);
     });
   }
 ));
 /* ----------------------------------------------------------------------- */
-passport.serializeUser(function(id, done) {
-  done(null, id);
+passport.serializeUser(function(user, done) {
+  done(null, user.id);
 });
 
 passport.deserializeUser(function(id, done) {
@@ -43,46 +32,8 @@ passport.deserializeUser(function(id, done) {
   });
 });
 /* ----------------------------------------------------------------------- */
-router.post('/auth/local/login', function(req, res, next) {
-  passport.authenticate('local', function(err, user) {
-    if (err) {
-      return next(err);
-    }
-    if (!user) {
-      return res.status(401).send({
-        message: 'Login failed!!!'
-      });
-    }
-    req.login(user, function(err) {
-      if (err) {
-        return next(err);
-      }
-      next();
-    });
-  })(req, res, next);
-}, function(req, res, next) {
-  var user = {};
-  user.email = req.user.email;
-  user.name = req.user.name;
-  res.send({
-    message: 'local login',
-    user: user
-  });
-});
-
-router.post('/auth/facebook/token', passport.authenticate('facebook-token'), function(req, res, next) {
-  if (req.user) {
-    User.findByNameAndProfileUrl(req.user, function(err, user) {
-      if (err) {
-        return next(err);
-      }
-      res.send({ result: user })
-    });
-  } else {
-    res.send({
-      error: "로그인에 실패하셨습니다."
-    });
-  }
+router.post('/auth/facebook/token', isSecure, passport.authenticate('facebook-token'), function(req, res, next) {
+    res.send(req.user ? { result: req.user } : { error: "로그인에 실패하였습니다." });
 });
 
 router.get('/logout', function(req, res, next) {

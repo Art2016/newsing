@@ -29,7 +29,7 @@ app.use(bodyParser.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(session({
   secret: process.env.SESSION_SECRET,
-  store: new RedisStore({
+  store: new RedisStore({ // redis에 저장
     host: '127.0.0.1',
     port: 6379,
     client: redisClient
@@ -39,18 +39,20 @@ app.use(session({
 }));
 app.use(passport.initialize());
 app.use(passport.session());
-app.use('/', express.static(path.join(__dirname, 'public')));
+// 로그인해야 서비스 사용가능하도록 설정
+app.use(require('./routes/common').isAuthenticated);
+app.use(express.static(path.join(__dirname, 'public')));
 // TODO: 이미지 디렉토리 구조 정의 필요
-//app.use('/images', express.static(path.join(__dirname, 'upload/images')));
+app.use('/images', express.static(path.join(__dirname, 'uploads/images')));
 
-app.use('/', auth);
-app.use('/users', user);
-app.use('/newscontents', newscontents);
-app.use('/scraps', scrap);
-app.use('/search', search);
-app.use('/keywords', keyword);
-app.use('/follows', follow);
-app.use('/notifications', notification);
+app.use('/', auth); // 로그인
+app.use('/users', user); // 사용자
+app.use('/newscontents', newscontents); // 뉴스 컨텐츠
+app.use('/scraps', scrap); // 스크랩
+app.use('/search', search); // 검색
+app.use('/keywords', keyword); // 키워드
+app.use('/follows', follow); // 팔로우
+app.use('/notifications', notification); // 알림
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {

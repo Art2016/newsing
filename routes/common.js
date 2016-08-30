@@ -1,5 +1,5 @@
 function isAuthenticated(req, res, next) {
-  if (!req.user) {
+  if (!req.user && !req.url.match(/\/auth.*/i)) { // 로그인을 반드시 하도록 설정
     return res.status(401).send({
       message: 'login required'
     });
