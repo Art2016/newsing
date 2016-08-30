@@ -2,6 +2,7 @@ var express = require('express');
 var router = express.Router();
 var Newscontents = require('../models/newscontents');
 
+// TODO: 뉴스 컨텐츠 조회
 router.get('/', function(req, res, next) {
   Newscontents.listNewscontents(function(err, results) {
     if (err) return next(err);
