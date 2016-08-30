@@ -1,6 +1,6 @@
 
 module.exports.listNewscontents = function(callback) {
-  
+
   var newscontents = {};
   newscontents["results"] = [];
   for (var i = 0; i< 10; i++) {
