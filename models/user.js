@@ -13,14 +13,16 @@ module.exports.findByNameAndProfileUrl = function(id, callback) {
     conn.query(sql, [id], function (err, results) {
       conn.release();
       if (err) return callback(err);
+      // 결과 값이 없을 경우 404
       if (results.length === 0) return callback(null, false);
+      // 결과 값을 user객체에 담기
       var user = {};
       user.id = results[0].id;
       user.name = results[0].name;
       // http로 시작하면 페이스북 사진
       if(results[0].pf_path.match(/http.+/i)) {
         user.pf_url = results[0].pf_path;
-      } else {
+      } else { // 파일에 접근할 url 생성
         var filename = path.basename(results[0].pf_path);
         user.pf_url = url.resolve(process.env.SERVER_HOST, '/images/' + filename);
       }
@@ -31,6 +33,7 @@ module.exports.findByNameAndProfileUrl = function(id, callback) {
 
 // 사용자 조회
 module.exports.findUser = function(id, callback) {
+  // 이름, 프로필 사진 경로, 자기 소개, 스크랩 수, 팔로잉 수, 팔로워 수
   var sql = 'select name, pf_path, aboutme, scrapings, followings, followers ' +
             'from user ' +
             'where id = ?';
@@ -40,20 +43,23 @@ module.exports.findUser = function(id, callback) {
     conn.query(sql, [id], function (err, results) {
       conn.release();
       if (err) return callback(err);
+      // 결과 값이 없을 경우 404
       if (results.length === 0) return callback(null, false);
+      // 결과 값을 user객체에 담기
       var user = {};
       user.name = results[0].name;
       // http로 시작하면 페이스북 사진
       if(results[0].pf_path.match(/http.+/i)) {
         user.pf_url = results[0].pf_path;
-      } else {
+      } else { // 파일에 접근할 url 생성
         var filename = path.basename(results[0].pf_path);
         user.pf_url = url.resolve(process.env.SERVER_HOST, '/images/' + filename);
       }
-      user.aboutme = results[0].aboutme;
+      user.aboutme = results[0].aboutme || ''; // null이 허용된 속성
       user.scrapings = results[0].scrapings;
       user.followings = results[0].followings;
       user.followers = results[0].followers;
+
       callback(null, user);
     });
   });
@@ -61,7 +67,7 @@ module.exports.findUser = function(id, callback) {
 
 // 로그인 시 DB에서 조회하여 있으면 사용자 데이터를 제공, 없으면 저장 후 제공
 module.exports.findOrCreate = function(profile, callback) {
-  // 사용자 id 조회
+  // 사용자 조회
   var sql_facebookid = "select id, name, pf_path " +
                         "from user " +
                         "where id = ?";
@@ -71,48 +77,55 @@ module.exports.findOrCreate = function(profile, callback) {
 
   dbPool.getConnection(function(err, conn) {
     if (err) return callback(err);
+    // 이미 있는 사용자인지 조회
     conn.query(sql_facebookid, [profile.id], function(err, results) {
       if (err) {
         conn.release();
         return callback(err);
       }
+      // 사용자가 이미 있다면...
       if (results.length !== 0) {
         conn.release();
+        // 결과 값을 user객체에 담기
         var user = {};
         user.id = results[0].id;
         user.name = results[0].name;
         // http로 시작하면 페이스북 사진
         if(results[0].pf_path.match(/http.+/i)) {
           user.pf_url = results[0].pf_path;
-        } else {
+        } else { // 파일에 접근할 url 생성
           var filename = path.basename(results[0].pf_path);
           user.pf_url = url.resolve(process.env.SERVER_HOST, '/images/' + filename);
         }
         return callback(null, user);
       }
+      // 없으면 생성...
       conn.query(sql_insert_facebookid, [profile.id, profile.displayName, profile.photos[0].value], function(err, result) {
         conn.release();
         if (err) {
           return callback(err);
         }
+        // 결과 값을 user객체에 담기
         var user = {};
         user.id = profile.id;
         user.name = profile.displayName;
         user.pf_url = profile.photos[0].value;
+
         return callback(null, user);
       });
     });
   });
 };
+
 // 사용자 정보 업데이트
 module.exports.updateUser = function(user, callback) {
   // 원래 값
-  var sql_select_user = 'select name, pf_path, aboutme ' +
+  var sql_select_user = 'select name, pf_path, aboutme, nt_fs, nt_s, nt_f ' +
                         'from user ' +
                         'where id = ?';
   // 이름, 사진 경로, 자기소개 업데이트
   var sql_update_user = 'update user ' +
-                        'set name = ?, pf_path = ?, aboutme = ? ' +
+                        'set name = ?, pf_path = ?, aboutme = ?, nt_fs = ?, nt_s = ?, nt_f = ? ' +
                         'where id = ?';
 
   dbPool.getConnection(function(err, conn) {
@@ -142,35 +155,41 @@ module.exports.updateUser = function(user, callback) {
       });
     });
     // 받아온 값 중에 null값이 있는 경우 원래 값을 세팅
-    function nullValueDefaulting(done) {
+    function nullValueDefaulting(next) {
       conn.query(sql_select_user, [user.id], function(err, results) {
         if (err) {
-          return done(err);
+          return next(err);
         }
         var originalUser = {}; // 원래 값을 넣을 객체
         originalUser.name = results[0].name;
         originalUser.pf_path = results[0].pf_path;
         originalUser.aboutme = results[0].aboutme;
-        done(null, originalUser);
+        originalUser.nt_fs = results[0].nt_fs;
+        originalUser.nt_s = results[0].nt_s;
+        originalUser.nt_f = results[0].nt_f;
+
+        next(null, originalUser);
       });
     }
     // 업데이트 실행
-    function updateUser(originalUser, done) {
+    function updateUser(originalUser, next) {
       // null일 경우 원래 값 세팅
       var name = user.name || originalUser.name;
       var pf_path = user.pf || originalUser.pf_path;
       var aboutme = user.aboutme || originalUser.aboutme;
+      var nt_fs = user.nt_fs || originalUser.nt_fs;
+      var nt_s = user.nt_s || originalUser.nt_s;
+      var nt_f = user.nt_f || originalUser.nt_f;
 
-      conn.query(sql_update_user, [name, pf_path, aboutme, user.id], function(err, result) {
-        conn.release();
-        if (err) return done(err);
+      conn.query(sql_update_user, [name, pf_path, aboutme, nt_fs, nt_s, nt_f, user.id], function(err, result) {
+        if (err) return next(err);
         // 이미지가 넘어왔을 경우 원본 이미지 삭제
         if (user.pf) {
           fs.unlink(originalUser.pf_path, function (err) {
-            if (err) return done(err);
+            if (err) return next(err);
           });
         }
-        done(null);
+        next(null);
       });
     }
   });
@@ -179,20 +198,20 @@ module.exports.updateUser = function(user, callback) {
 // 카테고리 목록
 module.exports.listCategory = function(data, callback) {
   var sql = '';
-  if (data.usage === 'scrap') { // 스크랩페이지에서 보여지는 목록
-    sql = 'select c.id id, c.name name ' +
+  if (data.usage === 'scrap') { // 스크랩 페이지에서 보여지는 목록
+    sql = 'select c.id, c.name ' +
           'from category c join user u on (u.id = c.user_id) ' +
           'where u.id = ? ' +
           'order by id ' +
           'limit ?, ?';
-  } else if (data.usage === 'profile') { // 마이페이지에서 보여지는 목록
-    sql = 'select c.id id, c.name name, c.img_path img_path, c.private private ' +
+  } else if (data.usage === 'profile') { // 마이 페이지에서 보여지는 목록
+    sql = 'select c.id, c.name, c.img_path, c.locked ' +
           'from category c join user u on (u.id = c.user_id) ' +
           'where u.id = ? ' +
           'order by id ' +
           'limit ?, ?';
   } else {
-    callback(null, false);
+    callback(null, false); // 어느 쪽도 아닌 경우 404
   }
 
   dbPool.getConnection(function(err, conn) {
@@ -203,6 +222,7 @@ module.exports.listCategory = function(data, callback) {
       if (err) return callback(err);
 
       async.map(results, function(item, done) {
+        // 'profile'일 경우 img_url 생성
         if (data.usage === 'profile') {
           var img_url = '';
           if (item.img_path === 'default') {
@@ -212,12 +232,12 @@ module.exports.listCategory = function(data, callback) {
             img_url = url.resolve(process.env.SERVER_HOST, '/images/' + filename);
           }
         }
-
+        // 'scrap'일 경우 null값인 img_url, locked는 자동으로 없어진다.
         done(null, {
           "id": item.id,
           "name": item.name,
           "img_url": img_url,
-          "private": item.private
+          "locked": item.locked
         });
       }, function(err, categories) {
         if (err) callback(err);
@@ -229,11 +249,12 @@ module.exports.listCategory = function(data, callback) {
 
 // 카테고리 생성
 module.exports.createCategory = function(category, callback) {
-  var sql = 'insert into category(user_id, name, img_path, private) values(?, ?, ?, ?)';
+  // 사용자 아이디, 카테고리 이름, 이미지 경로, 비공개 여부
+  var sql = 'insert into category(user_id, name, img_path, locked) values(?, ?, ?, ?)';
 
   dbPool.getConnection(function(err, conn) {
     if (err) return callback(err);
-    conn.query(sql, [category.uid, category.name, category.pf, category.private], function(err, result) {
+    conn.query(sql, [category.uid, category.name, category.img, category.locked], function(err, result) {
       conn.release();
       if (err) return callback(err);
       callback(null, {
@@ -246,12 +267,12 @@ module.exports.createCategory = function(category, callback) {
 // 카테고리 업데이트
 module.exports.updateCategory = function(category, callback) {
   // 원래 값
-  var sql_select_category = 'select name, img_path, private ' +
+  var sql_select_category = 'select name, img_path, locked ' +
                             'from category ' +
                             'where id = ?';
   // 이름, 이미지 경로, 비공개 여부 업데이트
   var sql_update_category = 'update category ' +
-                            'set name = ?, img_path = ?, private = ? ' +
+                            'set name = ?, img_path = ?, locked = ? ' +
                             'where id = ?';
 
   dbPool.getConnection(function(err, conn) {
@@ -281,34 +302,36 @@ module.exports.updateCategory = function(category, callback) {
       });
     });
     // 받아온 값 중에 null값이 있는 경우 원래 값을 세팅
-    function nullValueDefaulting(done) {
+    function nullValueDefaulting(next) {
       conn.query(sql_select_category, [category.cid], function(err, results) {
-        if (err) return done(err);
+        if (err) return next(err);
+        // 결과 값이 없을 경우 404
         if (results.length === 0) return callback(null, false);
-
-        var originalUser = {}; // 원래 값을 넣을 객체
+        // 원래 값을 넣을 객체
+        var originalUser = {};
         originalUser.name = results[0].name;
         originalUser.img_path = results[0].img_path;
-        originalUser.private = results[0].private;
-        done(null, originalUser);
+        originalUser.locked = results[0].locked;
+
+        next(null, originalUser);
       });
     }
     // 업데이트 실행
-    function updateCategory(originalUser, done) {
+    function updateCategory(originalUser, next) {
       // null일 경우 원래 값 세팅
       var name = category.name || originalUser.name;
       var img_path = category.img_path || originalUser.img_path;
-      var priv = category.private || originalUser.private;
+      var locked = category.locked || originalUser.locked;
 
-      conn.query(sql_update_category, [name, img_path, priv, category.cid], function(err, result) {
-        if (err) return done(err);
+      conn.query(sql_update_category, [name, img_path, locked, category.cid], function(err, result) {
+        if (err) return next(err);
         // 이미지가 넘어왔을 경우 원본 이미지 삭제
         if (category.img_path) {
           fs.unlink(originalUser.img_path, function (err) {
-            if (err) return done(err);
+            if (err) return next(err);
           });
         }
-        done(null);
+        next(null);
       });
     }
   });
@@ -316,12 +339,15 @@ module.exports.updateCategory = function(category, callback) {
 
 // 카테고리 삭제
 module.exports.removeCategory = function(id, callback) {
+  // 삭제 전 이미지 경로를 찾는 쿼리
   var sql_select_category_img = 'select img_path from category where id = ?';
+  // 카테고리 삭제하는 쿼리
   var sql_delete_category = 'delete from category where id = ?';
 
   dbPool.getConnection(function(err, conn) {
     if (err) return callback(err);
 
+    var img_path = ''; // 삭제 전 이미지 경로
     conn.beginTransaction(function (err) {
       if (err) {
         conn.release();
@@ -329,7 +355,7 @@ module.exports.removeCategory = function(id, callback) {
       }
       // db에서 카테고리 삭제 후 실제 이미지 파일 삭제
       // db는 rollback이 되지만 파일은 안되기 때문에...
-      async.series([deleteCategory, deleteImage], function(err) {
+      async.series([findImagePath, deleteCategory, deleteImage], function(err, image) {
         if (err) {
           return conn.rollback(function () {
             conn.release();
@@ -344,22 +370,29 @@ module.exports.removeCategory = function(id, callback) {
         });
       });
     });
+
+    // 이미지 path 찾기
+    function findImagePath(next) {
+      conn.query(sql_select_category_img, [id], function(err, results) {
+        if (err) return next(err);
+        // 결과 값이 없을 경우 404
+        if (results.length === 0) return callback(null, false);
+        img_path = results[0].img_path; // deleteImage 함수에서 쓰임
+        next(null);
+      });
+    }
     // 카테고리 삭제
-    function deleteCategory(done) {
-      conn.query(sql_delete_category, [id], function(err, result) {
-        if (err) return done(err);
-        done(null);
+    function deleteCategory(next) {
+      conn.query(sql_delete_category, [id], function(err, results) {
+        if (err) return next(err);
+        next(null);
       });
     }
     // 실제 이미지 파일 삭제
-    function deleteImage(done) {
-      conn.query(sql_select_category_img, [id], function(err, results) {
-        if (err) return done(err);
-        if (results.length === 0) return callback(null, false);
-        fs.unlink(results[0].img_path, function (err) {
-          if (err) return done(err);
-          done(null);
-        });
+    function deleteImage(next) {
+      fs.unlink(img_path, function (err) {
+        if (err) return next(err);
+        next(null);
       });
     }
   });

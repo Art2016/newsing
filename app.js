@@ -10,14 +10,14 @@ var redis = require('redis');
 var redisClient = redis.createClient();
 var RedisStore = require('connect-redis')(session);
 
-var auth = require('./routes/auth');
-var user = require('./routes/user');
-var newscontents = require('./routes/newscontents');
-var scrap = require('./routes/scrap');
-var search = require('./routes/search');
-var keyword = require('./routes/keyword');
-var follow = require('./routes/follow');
-var notification = require('./routes/notification');
+var auth = require('./routes/auth'); // 로그인
+var user = require('./routes/user'); // 사용자
+var newscontents = require('./routes/newscontents'); // 뉴스 컨텐츠
+var scrap = require('./routes/scrap'); // 스크랩
+var search = require('./routes/search'); // 검색
+var keyword = require('./routes/keyword'); // 키워드
+var follow = require('./routes/follow'); // 팔로우
+var notification = require('./routes/notification'); // 알림
 
 var app = express();
 

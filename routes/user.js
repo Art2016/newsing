@@ -7,7 +7,7 @@ var formidable = require('formidable');
 // 사용자 조회
 router.get('/:uid', function(req, res, next) {
   var uid = '';
-  // me일 경우 세션에 저장된 자기 아이디
+  // me일 경우 현재 세션의 아이디 사용
   if (req.params.uid === 'me') uid = req.user.id;
   else uid = req.params.uid;
 
@@ -16,7 +16,9 @@ router.get('/:uid', function(req, res, next) {
     if (!result) return res.status('404').send({
       "error": "해당 사용자가 없습니다."
     });
-    res.send(result);
+    res.send({
+      result: result
+    });
   });
 });
 
@@ -30,12 +32,18 @@ router.put('/me', function(req, res, next) {
   form.multiples = false;
   form.parse(req, function(err, fields, files) {
     if(err) return next(err);
+    // user 객체에 매개변수를 담기
     var user = {};
     user.id = uid;
     user.name = fields.name;
+    // 파일이 없을 때 오류 방지
     if(files.pf) user.pf = files.pf.path;
     else user.pf = null;
     user.aboutme = fields.aboutme;
+    // 3가지 알림 설정
+    user.nt_fs = fields.nt_fs;
+    user.nt_s = fields.nt_s;
+    user.nt_f = fields.nt_f;
 
     User.updateUser(user, function(err, result) {
       if (err) return next(err);
@@ -47,23 +55,27 @@ router.put('/me', function(req, res, next) {
   });
 });
 
-// 카테고리 조회
+// 카테고리 목록
 router.get('/:uid/categories', function(req, res, next) {
   var uid = '';
+  // me일 경우 현재 세션의 아이디 사용
   if (req.params.uid === 'me') uid = req.user.id;
   else uid = req.params.uid;
-
+  // date 객체에 매개변수를 담기
   var data = {};
   data.uid = uid;
-  data.usage = req.query.usage;
+  data.usage = req.query.usage; // "scrap" or "profile"
   data.page = parseInt(req.query.page) || 1;
   data.count = parseInt(req.query.count) || 20;
+
   User.listCategory(data, function(err, results) {
     if (err) return next(err);
     if (!results) return res.status('404').send({
       "error": "카테고리를 불러오는데 실패하였습니다."
     });
-    res.send(results);
+    res.send({
+      results: results
+    });
   });
 });
 
@@ -77,13 +89,14 @@ router.post('/me/categories', function(req, res, next) {
   form.multiples = false;
   form.parse(req, function(err, fields, files) {
     if(err) return next(err);
+    // category 객체에 매개변수 담기
     var category = {};
     category.uid = uid;
     category.name = fields.name;
     // 카테고리 이미지를 안 넣었을 때 디폴트 처리
-    if (files.img) category.pf = files.img.path;
-    else category.pf = 'default';
-    category.private = fields.private;
+    if (files.img) category.img = files.img.path;
+    else category.img = 'default'; // 안드로이드에 저장된 디폴트 이미지 적용
+    category.locked = fields.locked;
 
     User.createCategory(category, function(err, result) {
       if (err) return next(err);
@@ -105,12 +118,14 @@ router.put('/me/categories/:cid', function(req, res, next) {
   form.multiples = false;
   form.parse(req, function(err, fields, files) {
     if(err) return next(err);
+    // category 객체에 매개변수 담기
     var category = {};
     category.cid = cid;
     category.name = fields.name;
+    // 파일이 없을 때 오류 방지
     if (files.img) category.img_path = files.img.path;
     else category.img_path = null;
-    category.private = fields.private;
+    category.locked = fields.locked;
 
     User.updateCategory(category, function(err, result) {
       if (err) return next(err);
@@ -122,6 +137,7 @@ router.put('/me/categories/:cid', function(req, res, next) {
   });
 });
 
+// 카테고리 삭제
 router.delete('/me/categories/:cid', function(req, res, next) {
   var cid = parseInt(req.params.cid);
 
