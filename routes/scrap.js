@@ -6,58 +6,27 @@ var formidable = require('formidable');
 
 // 스크랩 생성
 router.post('/', function(req, res, next) {
-  var form = new formidable.IncomingForm();
-  // fields를 배열로 받기 위한 설정
-  var formFields = {};
-  // tag[0] = '의자', tag[1] = '러그'
-  // tag[] = '의자', tag[] = '러그'
-  // tag = '의자', tag = '러그'
-  form.on('field', function(name, value) {
-    function makeFormFields(prop, val) {
-      if (!formFields[prop]) {
-        formFields[prop] = val;
-      } else {
-        if (formFields[prop] instanceof Array) { // 배열일 경우
-          formFields[prop].push(val);
-        } else { // 배열이 아닐 경우
-          var tmp = formFields[prop];
-          formFields[prop] = [];
-          formFields[prop].push(tmp);
-          formFields[prop].push(val);
-        }
-      }
+  // scrap 객체에 매개변수 담기
+  var scrap = {};
+  scrap.uid = req.user.id;
+  scrap.cid = parseInt(req.body.cid);
+  scrap.ncid = parseInt(req.body.ncid);
+  scrap.title = req.body.title;
+  scrap.content = req.body.content;
+  scrap.locked = req.body.locked;
+  scrap.tags = [];
+  var tags = req.body.tags || ''; // 값이 없을 경우 오류 방지
+  if (tags instanceof Array) { // 배열일 경우
+    for (var i = 0; i < tags.length; i++) {
+      if (tags[i].trim() !== '') scrap.tags.push(tags[i].trim());
     }
-    var re1 = /\[\]/;
-    var re2 = /\[\d+\]/;
-    if (name.match(re1)) {
-      name = name.replace(re1, '');
-    } else if (name.match(/\[\d+\]/)) {
-      name = name.replace(re2, '');
-    }
-    makeFormFields(name, value);
-  });
-  form.uploadDir = path.join(__dirname, '../uploads/images');
-  form.keepExtensions = true;
-  form.multiples = false;
-  form.parse(req, function(err, fields, files) {
-    if(err) return next(err);
-    // scrap 객체에 매개변수 담기
-    var scrap = {};
-    scrap.uid = req.user.id;
-    scrap.cid = parseInt(fields.cid);
-    scrap.ncid = parseInt(fields.ncid);
-    scrap.title = fields.title;
-    scrap.content = fields.content;
-    // 스크랩 이미지를 안 넣었을 때
-    if (files.img) scrap.pf = files.img.path;
-    else scrap.pf = null;
-    scrap.locked = fields.locked;
-    scrap.tags = formFields['tags']; // 태그 배열
+  } else {
+    if (tags.trim() !== '') scrap.tags.push(tags.trim());
+  } // scrap.tags는 빈 배열 또는 원소 하나 이상인 배열이다
 
-    Scrap.createScrap(scrap, function(err, result) {
-      if (err) return next(err);
-      res.send(result);
-    });
+  Scrap.createScrap(scrap, function(err, result) {
+    if (err) return next(err);
+    res.send(result);
   });
 });
 
@@ -79,63 +48,83 @@ router.get('/', function(req ,res, next) {
   });
 });
 
-// TODO: 스크랩 삭제
+// 스크랩 삭제
 router.delete('/:sid', function(req ,res, next) {
-  var sid = req.params.sid;
+  var sid = parseInt(req.params.sid);
+  var uid = req.user.id;
 
-  Scrap.removeScrap(sid, function(err, result) {
+  Scrap.removeScrap(sid, uid, function(err, result) {
     if (err) return next(err);
+    if (!result) return res.status('404').send({
+      "error": "스크랩 삭제를 실패하였습니다."
+    });
     res.send(result);
   });
 });
 
+// 스크랩 변경
 router.put('/:sid', function(req, res, next) {
-  var form = new formidable.IncomingForm();
-  //form.uploadDir = path.join(__dirname, '../uploads/images/' + uid);
-  form.keepExtensions = true;
-  form.multiples = false;
-  form.parse(req, function(err, fields, files) {
-    if(err) return next(err);
-    var scrap = {};
-    scrap.sid = req.params.sid;
-    scrap.title = fields.title;
-    scrap.content = fields.content;
-    scrap.img = files.img;
-    scrap.locked  = fields.locked;
-    scrap.tags  = fields.tags;
+  var scrap = {};
+  scrap.id = parseInt(req.params.sid);
+  scrap.title = req.body.title;
+  scrap.content = req.body.content;
+  scrap.locked  = req.body.locked;
+  scrap.tags = [];
+  var tags = req.body.tags || ''; // 값이 없을 경우 오류 방지
+  if (tags instanceof Array) { // 배열일 경우
+    for (var i = 0; i < tags.length; i++) {
+      if (tags[i].trim() !== '') scrap.tags.push(tags[i].trim());
+    }
+  } else {
+    if (tags.trim() !== '') scrap.tags.push(tags.trim());
+  } // scrap.tags는 빈 배열 또는 원소 하나 이상인 배열이다
 
-    Scrap.updateScrap(scrap, function(err, result) {
-      if (err) return next(err);
-      res.send(result);
+  Scrap.updateScrap(scrap, function(err, result) {
+    if (err) return next(err);
+    if (!result) return res.status('404').send({
+      "error": "스크랩 수정을 실패하였습니다."
+    });
+    res.send(result);
+  });
+});
+
+// 스크랩 상세 조회
+router.get('/:sid', function(req, res, next) {
+  var sid = parseInt(req.params.sid);
+  var uid = req.user.id;
+
+  Scrap.findScrap(sid, uid, function(err, result) {
+    if (err) return next(err);
+    if (!result) return res.status('404').send({
+      "error": "해당 스크랩이 없습니다."
+    });
+    res.send({
+      result: result
     });
   });
 });
 
-router.get('/:sid', function(req, res, next) {
-  var sid = req.query.sid;
-
-  Scrap.findScrap(sid, function(err, result) {
-    if (err) return next(err);
-    res.send(result);
-  });
-});
-
+// '좋아요' 이모티콘 생성
 router.post('/:sid/favorites', function(req, res, next) {
-  var uid = req.params.uid;
-  var sid = req.params.sid;
+  var sid = parseInt(req.params.sid);
+  var uid = req.user.id;
 
-  Scrap.createFavorites(uid, sid, function(err, result) {
+  Scrap.createFavorite(sid, uid, function(err, result) {
     if (err) return next(err);
     res.send(result);
   });
 });
 
+// '좋아요' 이모티콘 해제
 router.delete('/:sid/favorites/me', function(req, res, next) {
+  var sid = parseInt(req.params.sid);
   var uid = req.user.id;
-  var sid = req.query.sid;
 
-  Scrap.removeFavorites(uid, sid, function(err, result) {
+  Scrap.removeFavorite(sid, uid, function(err, result) {
     if (err) return next(err);
+    if (!result) return res.status('404').send({
+      "error": "실패하였습니다."
+    });
     res.send(result);
   });
 });

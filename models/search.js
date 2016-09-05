@@ -72,49 +72,57 @@ module.exports.findUsers = function(data, callback) {
         "id": 1,
         "pf_url": "http://.../images/user/id/pf_picture.bmp",
         "name": "이임수",
-        "aboutme": "사용자 자기소개"
+        "aboutme": "사용자 자기소개",
+        "flag": false
       },
       {
         "id": 2,
         "pf_url": "http://.../images/user/id/pf_picture.bmp",
         "name": "서창욱",
-        "aboutme": "사용자 자기소개"
+        "aboutme": "사용자 자기소개",
+        "flag": true
       },
       {
         "id": 3,
         "pf_url": "http://.../images/user/id/pf_picture.bmp",
         "name": "임지수",
-        "aboutme": "사용자 자기소개"
+        "aboutme": "사용자 자기소개",
+        "flag": false
       },
       {
         "id": 4,
         "pf_url": "http://.../images/user/id/pf_picture.bmp",
         "name": "신미은",
-        "aboutme": "사용자 자기소개"
+        "aboutme": "사용자 자기소개",
+        "flag": false
       },
       {
         "id": 5,
         "pf_url": "http://.../images/user/id/pf_picture.bmp",
         "name": "이혜람",
-        "aboutme": "사용자 자기소개"
+        "aboutme": "사용자 자기소개",
+        "flag": true
       },
       {
         "id": 6,
         "pf_url": "http://.../images/user/id/pf_picture.bmp",
         "name": "정다솜",
-        "aboutme": "사용자 자기소개"
+        "aboutme": "사용자 자기소개",
+        "flag": true
       },
       {
         "id": 7,
         "pf_url": "http://.../images/user/id/pf_picture.bmp",
         "name": "김예진",
-        "aboutme": "사용자 자기소개"
+        "aboutme": "사용자 자기소개",
+        "flag": true
       },
       {
         "id": 8,
         "pf_url": "http://.../images/user/id/pf_picture.bmp",
         "name": "사용자 이름",
-        "aboutme": "사용자 자기소개"
+        "aboutme": "사용자 자기소개",
+        "flag": true
       }
     ]
   });
@@ -157,6 +165,7 @@ module.exports.findScraps = function(data, callback) {
         "nc_img_url" : "http://.../images/newscontents/20160821.bmp",
         "nc_author": "뉴스 컨텐츠 언론사",
         "nc_dtime": "2016-08-23 13:22:33",
+        "locked": false,
         "favorite_cnt" : 1,
         "favorite": true
       },
@@ -167,6 +176,7 @@ module.exports.findScraps = function(data, callback) {
         "nc_img_url" : "http://.../images/newscontents/20160821.bmp",
         "nc_author": "뉴스 컨텐츠 언론사",
         "nc_dtime": "2016-08-23 13:22:33",
+        "locked": false,
         "favorite_cnt" : 1,
         "favorite": false
       },
@@ -177,6 +187,7 @@ module.exports.findScraps = function(data, callback) {
         "nc_img_url" : "http://.../images/newscontents/20160821.bmp",
         "nc_author": "뉴스 컨텐츠 언론사",
         "nc_dtime": "2016-08-23 13:22:33",
+        "locked": false,
         "favorite_cnt" : 1,
         "favorite": true
       },
@@ -187,6 +198,7 @@ module.exports.findScraps = function(data, callback) {
         "nc_img_url" : "http://.../images/newscontents/20160821.bmp",
         "nc_author": "뉴스 컨텐츠 언론사",
         "nc_dtime": "2016-08-23 13:22:33",
+        "locked": false,
         "favorite_cnt" : 1,
         "favorite": true
       },
@@ -197,6 +209,7 @@ module.exports.findScraps = function(data, callback) {
         "nc_img_url" : "http://.../images/newscontents/20160821.bmp",
         "nc_author": "뉴스 컨텐츠 언론사",
         "nc_dtime": "2016-08-23 13:22:33",
+        "locked": false,
         "favorite_cnt" : 1,
         "favorite": false
       },
@@ -207,6 +220,7 @@ module.exports.findScraps = function(data, callback) {
         "nc_img_url" : "http://.../images/newscontents/20160821.bmp",
         "nc_author": "뉴스 컨텐츠 언론사",
         "nc_dtime": "2016-08-23 13:22:33",
+        "locked": false,
         "favorite_cnt" : 1,
         "favorite": true
       },
@@ -217,6 +231,7 @@ module.exports.findScraps = function(data, callback) {
         "nc_img_url" : "http://.../images/newscontents/20160821.bmp",
         "nc_author": "뉴스 컨텐츠 언론사",
         "nc_dtime": "2016-08-23 13:22:33",
+        "locked": false,
         "favorite_cnt" : 1,
         "favorite": false
       },
@@ -227,6 +242,7 @@ module.exports.findScraps = function(data, callback) {
         "nc_img_url" : "http://.../images/newscontents/20160821.bmp",
         "nc_author": "뉴스 컨텐츠 언론사",
         "nc_dtime": "2016-08-23 13:22:33",
+        "locked": false,
         "favorite_cnt" : 1,
         "favorite": false
       },
@@ -237,6 +253,7 @@ module.exports.findScraps = function(data, callback) {
         "nc_img_url" : "http://.../images/newscontents/20160821.bmp",
         "nc_author": "뉴스 컨텐츠 언론사",
         "nc_dtime": "2016-08-23 13:22:33",
+        "locked": false,
         "favorite_cnt" : 1,
         "favorite": true
       },
@@ -247,6 +264,7 @@ module.exports.findScraps = function(data, callback) {
         "nc_img_url" : "http://.../images/newscontents/20160821.bmp",
         "nc_author": "뉴스 컨텐츠 언론사",
         "nc_dtime": "2016-08-23 13:22:33",
+        "locked": false,
         "favorite_cnt" : 1,
         "favorite": true
       }

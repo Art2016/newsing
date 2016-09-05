@@ -68,12 +68,12 @@ module.exports.findUser = function(id, callback) {
 // 로그인 시 DB에서 조회하여 있으면 사용자 데이터를 제공, 없으면 저장 후 제공
 module.exports.findOrCreate = function(profile, callback) {
   // 사용자 조회
-  var sql_facebookid = "select id, name, pf_path " +
+  var sql_facebookid = "select id, name, pf_path, nt_fs, nt_s, nt_f " +
                         "from user " +
                         "where id = ?";
   // 사용자 생성
-  var sql_insert_facebookid = "insert into user(id, token, name, pf_path) " +
-                               "value (?, ?, ?, ?)";
+  var sql_insert_facebookid = "insert into user(id, name, pf_path) " +
+                               "value (?, ?, ?)";
 
   dbPool.getConnection(function(err, conn) {
     if (err) return callback(err);
@@ -97,10 +97,13 @@ module.exports.findOrCreate = function(profile, callback) {
           var filename = path.basename(results[0].pf_path);
           user.pf_url = url.resolve(process.env.SERVER_HOST, '/images/' + filename);
         }
+        user.nt_fs = (results[0].nt_fs === 1) ? true : false;
+        user.nt_s = (results[0].nt_s === 1) ? true : false;
+        user.nt_f = (results[0].nt_f === 1) ? true : false;
         return callback(null, user);
       }
       // 없으면 생성...
-      conn.query(sql_insert_facebookid, [profile.id, profile.displayName, profile.photos[0].value], function(err, result) {
+      conn.query(sql_insert_facebookid, [profile.id, profile.displayName, profile.photos[0].value], function(err) {
         conn.release();
         if (err) {
           return callback(err);
@@ -110,7 +113,9 @@ module.exports.findOrCreate = function(profile, callback) {
         user.id = profile.id;
         user.name = profile.displayName;
         user.pf_url = profile.photos[0].value;
-
+        user.nt_fs = true;
+        user.nt_s = true;
+        user.nt_f = true;
         return callback(null, user);
       });
     });
@@ -195,6 +200,27 @@ module.exports.updateUser = function(user, callback) {
   });
 };
 
+// 알림 설정
+module.exports.updateNotification = function(nt, callback) {
+  var sql = '';
+  if (nt.action === 'fs') sql = 'update user set nt_fs = ? where id = ?'; // 팔로잉 스크랩 알림
+  else if (nt.action === 's') sql = 'update user set nt_s = ? where id = ?'; // 내 스크랩 좋아요 알림
+  else if (nt.action === 'f') sql = 'update user set nt_f = ? where id = ?'; // 팔로우 알림
+
+  dbPool.getConnection(function(err, conn) {
+    if (err) return callback(err);
+
+    conn.query(sql, [nt.state, nt.uid], function(err, result) {
+      conn.release();
+      if (err) return next(err);
+
+      callback(null, {
+        "result": "설정이 완료되었습니다."
+      });
+    });
+  });
+};
+
 // 카테고리 목록
 module.exports.listCategory = function(data, callback) {
   var sql = '';
@@ -237,7 +263,7 @@ module.exports.listCategory = function(data, callback) {
           "id": item.id,
           "name": item.name,
           "img_url": img_url,
-          "locked": item.locked
+          "locked": (item.locked === 1) ? true : false
         });
       }, function(err, categories) {
         if (err) callback(err);
@@ -339,6 +365,14 @@ module.exports.updateCategory = function(category, callback) {
 
 // 카테고리 삭제
 module.exports.removeCategory = function(id, callback) {
+  // 해당 카테고리에 스크랩 검색
+  var sql_select_scrap = 'select id from scrap where category_id = ?';
+  // 검색된 스크랩 id로 favorite 삭제
+  var sql_delete_favorite = 'delete from favorite where scrap_id in (?)';
+  // 검색된 스크랩 id로 scrap_tag 삭제
+  var sql_delete_scrap_tag = 'delete from scrap_tag where scrap_id in (?)';
+  // 스크랩 삭제
+  var sql_delete_scrap = 'delete from scrap where category_id = ?';
   // 삭제 전 이미지 경로를 찾는 쿼리
   var sql_select_category_img = 'select img_path from category where id = ?';
   // 카테고리 삭제하는 쿼리
@@ -347,6 +381,7 @@ module.exports.removeCategory = function(id, callback) {
   dbPool.getConnection(function(err, conn) {
     if (err) return callback(err);
 
+    var scrap_ids = [];
     var img_path = ''; // 삭제 전 이미지 경로
     conn.beginTransaction(function (err) {
       if (err) {
@@ -355,7 +390,7 @@ module.exports.removeCategory = function(id, callback) {
       }
       // db에서 카테고리 삭제 후 실제 이미지 파일 삭제
       // db는 rollback이 되지만 파일은 안되기 때문에...
-      async.series([findImagePath, deleteCategory, deleteImage], function(err, image) {
+      async.series([findScrapIds, removeFavoriteAndScrapTag, removeScrap, findImagePath, removeCategory, removeImage], function(err) {
         if (err) {
           return conn.rollback(function () {
             conn.release();
@@ -370,26 +405,68 @@ module.exports.removeCategory = function(id, callback) {
         });
       });
     });
-
+    // 스크랩 아이디 검색
+    function findScrapIds(next) {
+      conn.query(sql_select_scrap, [id], function(err, results) {
+        if (err) return next(err);
+        if (results.length === 0) return next(null);
+        async.each(results, function(item, done) {
+          scrap_ids.push(item.id);
+          done(null);
+        }, function(err) {
+          if(err) return next(err);
+          next(null);
+        });
+      });
+    }
+    // favorite와 scrap_tag 삭제 병렬 처리
+    function removeFavoriteAndScrapTag(next) {
+      async.parallel([removeFavorite, removeScrapTag], function(err) {
+        if (err) next(err);
+        next(null);
+      });
+    }
+    // favorite 삭제
+    function removeFavorite(done) {
+      conn.query(sql_delete_favorite, [scrap_ids], function(err) {
+        if (err) return done(err);
+        done(null);
+      });
+    }
+    // scrap_tag 삭제
+    function removeScrapTag(done) {
+      conn.query(sql_delete_scrap_tag, [scrap_ids], function(err) {
+        if (err) return done(err);
+        done(null);
+      });
+    }
+    // scrap 삭제
+    function removeScrap(next) {
+      conn.query(sql_delete_scrap, [id], function(err) {
+        if (err) return next(err);
+        next(null);
+      });
+    }
     // 이미지 path 찾기
     function findImagePath(next) {
       conn.query(sql_select_category_img, [id], function(err, results) {
         if (err) return next(err);
         // 결과 값이 없을 경우 404
         if (results.length === 0) return callback(null, false);
-        img_path = results[0].img_path; // deleteImage 함수에서 쓰임
+        img_path = results[0].img_path; // removeImage 함수에서 쓰임
         next(null);
       });
     }
     // 카테고리 삭제
-    function deleteCategory(next) {
+    function removeCategory(next) {
       conn.query(sql_delete_category, [id], function(err, results) {
         if (err) return next(err);
         next(null);
       });
     }
     // 실제 이미지 파일 삭제
-    function deleteImage(next) {
+    function removeImage(next) {
+      if (img_path === 'default') return next(null);
       fs.unlink(img_path, function (err) {
         if (err) return next(err);
         next(null);

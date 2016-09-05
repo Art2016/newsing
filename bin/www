@@ -105,3 +105,7 @@ function onListening() {
     : 'port ' + addr.port;
   debug('Listening on ' + bind);
 }
+
+process.on('uncaughException', function(err) {
+  console.log('uncaughtException: ' + err);
+});

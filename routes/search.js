@@ -35,7 +35,9 @@ router.get('/', function(req, res, next) {
       });
       break;
     default:
-      res.send('다른 값이 왔을 때 처리');
+      res.status('404').send({
+          "error": "올바른 검색이 아닙니다."
+      });
   }
 });
 

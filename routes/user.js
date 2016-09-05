@@ -23,36 +23,53 @@ router.get('/:uid', function(req, res, next) {
 });
 
 // 나의 사용자 정보 변경
-router.put('/me', function(req, res, next) {
+router.put('/:uid', function(req, res, next) {
+  if (req.params.uid !== 'me') return next();
   var uid = req.user.id;
 
-  var form = new formidable.IncomingForm();
-  form.uploadDir = path.join(__dirname, '../uploads/images');
-  form.keepExtensions = true;
-  form.multiples = false;
-  form.parse(req, function(err, fields, files) {
-    if(err) return next(err);
-    // user 객체에 매개변수를 담기
-    var user = {};
-    user.id = uid;
-    user.name = fields.name;
-    // 파일이 없을 때 오류 방지
-    if(files.pf) user.pf = files.pf.path;
-    else user.pf = null;
-    user.aboutme = fields.aboutme;
-    // 3가지 알림 설정
-    user.nt_fs = fields.nt_fs;
-    user.nt_s = fields.nt_s;
-    user.nt_f = fields.nt_f;
+  var action = req.query.nt;
+  // 사용자 알림 정보 변경
+  if (action === 'fs' || action === 's' || action === 'f') {
+    var nt = {};
+    nt.uid = uid;
+    nt.action = action;
+    nt.state = req.body.nt_state;
 
-    User.updateUser(user, function(err, result) {
+    User.updateNotification(nt, function(err, result) {
       if (err) return next(err);
       if (!result) return res.status('404').send({
-        "error": "수정을 실패하였습니다."
+        "error": "설정을 실패하였습니다."
       });
       res.send(result);
     });
-  });
+  } else if (action === 'no') {
+    // 사용자 정보 변경
+    var form = new formidable.IncomingForm();
+    form.uploadDir = path.join(__dirname, '../uploads/images');
+    form.keepExtensions = true;
+    form.multiples = false;
+    form.parse(req, function(err, fields, files) {
+      if(err) return next(err);
+      // user 객체에 매개변수를 담기
+      var user = {};
+      user.id = uid;
+      user.name = fields.name;
+      // 파일이 없을 때 오류 방지
+      if(files.pf) user.pf = files.pf.path;
+      else user.pf = null;
+      user.aboutme = fields.aboutme;
+
+      User.updateUser(user, function(err, result) {
+        if (err) return next(err);
+        if (!result) return res.status('404').send({
+          "error": "수정을 실패하였습니다."
+        });
+        res.send(result);
+      });
+    });
+  } else {
+    return next();
+  }
 });
 
 // 카테고리 목록
@@ -80,7 +97,8 @@ router.get('/:uid/categories', function(req, res, next) {
 });
 
 // 나의 카테고리 생성
-router.post('/me/categories', function(req, res, next) {
+router.post('/:uid/categories', function(req, res, next) {
+  if (req.params.uid !== 'me') return next();
   var uid = req.user.id;
 
   var form = new formidable.IncomingForm();
@@ -109,7 +127,8 @@ router.post('/me/categories', function(req, res, next) {
 });
 
 // 카테고리 변경
-router.put('/me/categories/:cid', function(req, res, next) {
+router.put('/:uid/categories/:cid', function(req, res, next) {
+  if (req.params.uid !== 'me') return next();
   var cid = parseInt(req.params.cid);
 
   var form = new formidable.IncomingForm();
@@ -138,7 +157,8 @@ router.put('/me/categories/:cid', function(req, res, next) {
 });
 
 // 카테고리 삭제
-router.delete('/me/categories/:cid', function(req, res, next) {
+router.delete('/:uid/categories/:cid', function(req, res, next) {
+  if (req.params.uid !== 'me') return next();
   var cid = parseInt(req.params.cid);
 
   User.removeCategory(cid, function(err, result) {

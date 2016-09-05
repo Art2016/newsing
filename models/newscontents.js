@@ -3,7 +3,7 @@ var async = require('async');
 
 module.exports.listNewscontents = function(callback) {
   // 오늘의 키워드와 해당하는 뉴스 기사를 가져오는 쿼리
-  var sql = 'select k.word keyword, nc.id, nc.title, nc.content, nc.img_url, convert_tz(nc.ntime, "+00:00", "+09:00") ntime, nc.author ' +
+  var sql = 'select k.word keyword, nc.id, nc.title, nc.content, nc.img_url, date_format(convert_tz(nc.ntime, "+00:00", "+09:00"), "%Y-%m-%d %H:%i:%s") ntime, nc.author ' +
             'from news_contents nc join keyword k on (k.id = nc.keyword_id) ' +
             'where k.ktime >= CURDATE()';
 
@@ -75,7 +75,7 @@ module.exports.listNewscontents = function(callback) {
 // 뉴스 컨텐츠 상세 조회
 module.exports.findNewscontents = function(id, callback) {
   // id값으로 뉴스 컨텐츠 찾는 쿼리
-  var sql = 'select title, content, img_url, link, convert_tz(ntime, "+00:00", "+09:00") ntime, author ' +
+  var sql = 'select title, content, img_url, link, date_format(convert_tz(ntime, "+00:00", "+09:00"), "%Y-%m-%d %H:%i:%s") ntime, author ' +
             'from news_contents ' +
             'where id = ?';
 
