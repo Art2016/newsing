@@ -1,19 +1,23 @@
 var express = require('express');
 var router = express.Router();
 var Follow = require('../models/follow');
+var logger = require('../common/logger');
 
+// 팔로잉 / 팔로워 목록
 router.get('/', function(req ,res, next) {
   var direction = req.query.direction;
-  var page = req.query.page;
-  var count = req.query.count;
+  var data = {};
+  data.id = req.user.id;
+  data.page = parseInt(req.query.page);
+  data.count = parseInt(req.query.count);
 
   if (direction === 'to') {
-    Follow.listFollowing(page, count, function(err, results) {
+    Follow.listFollowing(data, function(err, results) {
       if (err) return next(err);
       res.send(results);
     });
   } else if (direction === 'from') {
-    Follow.listFollower(page, count, function(err, results) {
+    Follow.listFollower(data, function(err, results) {
       if (err) return next(err);
       res.send(results);
     });
@@ -22,7 +26,7 @@ router.get('/', function(req ,res, next) {
 
 router.post('/', function(req, res, next) {
   var id = req.user.id;
-  var id_o = req.body.uid;
+  var id_o = req.body.ofid;
 
   Follow.createFollow(id, id_o, function(err, result) {
     if (err) return next(err);
@@ -30,11 +34,15 @@ router.post('/', function(req, res, next) {
   });
 });
 
-router.delete('/:uid', function(req, res, next) {
-  var uid = req.params.uid;
+router.delete('/:ofid', function(req, res, next) {
+  var id = req.user.id;
+  var id_o = req.params.ofid;
 
-  Follow.removeFollow(uid, function(err, result) {
+  Follow.removeFollow(id, id_o, function(err, result) {
     if (err) return next(err);
+    if (!result) return res.status('404').send({
+      "error": "팔로우를 해제하는데 실패하였습니다."
+    });
     res.send(result);
   });
 });

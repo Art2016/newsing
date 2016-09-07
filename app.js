@@ -42,7 +42,7 @@ app.use(passport.session());
 // 로그인해야 서비스 사용가능하도록 설정
 app.use(require('./routes/common').isAuthenticated);
 app.use(express.static(path.join(__dirname, 'public')));
-// TODO: 이미지 디렉토리 구조 정의 필요
+// 이미지 디렉토리
 app.use('/images', express.static(path.join(__dirname, 'uploads/images')));
 
 app.use('/', auth); // 로그인

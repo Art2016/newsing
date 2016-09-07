@@ -1,273 +1,158 @@
+var dbPool = require('../common/dbpool');
+var async = require('async');
+var path = require('path');
+var url = require('url');
+
+// 뉴스 컨텐츠 검색
 module.exports.findNewscontents = function(data, callback) {
-  callback(null, {
-    "results": [
-      {
-        "id": 1,
-        "title": "니콘, 신제품 DSLR 'D3400' 내달 출시",
-        "author": "언론사",
-        "ntime": "2016-08-23 13:22:33"
-      },
-      {
-        "id": 2,
-        "title": "삼성 약진…스마트폰 수익점유율 30% 돌파",
-        "author": "언론사",
-        "ntime": "2016-08-23 13:22:33"
-      },
-      {
-        "id": 3,
-        "title": "구글, 국내 비영리 단체 10곳에 35억원 지원",
-        "author": "언론사",
-        "ntime": "2016-08-23 13:22:33"
-      },
-      {
-        "id": 4,
-        "title": "4차산업혁명 원동력은 소프트파워",
-        "author": "언론사",
-        "ntime": "2016-08-23 13:22:33"
-      },
-      {
-        "id": 5,
-        "title": "최재유 차관 “'알파고 쇼크', AI 발전 정부가 주도”",
-        "author": "언론사",
-        "ntime": "2016-08-23 13:22:33"
-      },
-      {
-        "id": 6,
-        "title": "인포마크, 독일·노르웨이·베트남에 키즈폰 출시",
-        "author": "언론사",
-        "ntime": "2016-08-23 13:22:33"
-      },
-      {
-        "id": 7,
-        "title": "할리데이비슨, 스타필드 하남에 부티크 매장 연다",
-        "author": "언론사",
-        "ntime": "2016-08-23 13:22:33"
-      },
-      {
-        "id": 8,
-        "title": "팔팔게임즈, 웹게임 '무극천하' 25일 CBT 시작",
-        "author": "언론사",
-        "ntime": "2016-08-23 13:22:33"
-      },
-      {
-        "id": 9,
-        "title": "엘케이오토, 英 스포츠카 로터스 할인 판매",
-        "author": "언론사",
-        "ntime": "2016-08-23 13:22:33"
-      },
-      {
-        "id": 10,
-        "title": "이엔피게임즈, ‘블레이블루’ 사전예약 20만명 돌파",
-        "author": "언론사",
-        "ntime": "2016-08-23 13:22:33"
-      }
-    ]
+  // 해당 검색어로 뉴스 컨텐츠 찾는 쿼리
+  var sql = 'select id, title, author, date_format(convert_tz(ntime, "+00:00", "+09:00"), "%Y-%m-%d %H:%i:%s") ntime ' +
+            'from news_contents ' +
+            'where title like ? ' +
+            'order by ntime desc, id desc ' +
+            'limit ?, ?';
+
+  dbPool.getConnection(function(err, conn) {
+    if (err) return callback(err);
+    conn.query(sql, [data.word, data.count * (data.page - 1), data.count], function (err, results) {
+      conn.release();
+      if (err) return callback(err);
+      // 검색 결과를 담을 객체
+      var newscontents = {};
+      newscontents['results'] = [];
+      // 값이 없을 경우 빈 배열
+      if (results.length === 0) return callback(null, newscontents);
+
+      async.each(results, function(item, done) {
+        newscontents.results.push({
+          id: item.id,
+          title: item.title,
+          author: item.author,
+          ntime: item.ntime
+        });
+        done(null);
+      }, function(err) {
+        if (err) callback(err);
+        callback(null, newscontents);
+      });
+    });
   });
 };
 
+// 사용자 검색
 module.exports.findUsers = function(data, callback) {
-  callback(null, {
-    "results": [
-      {
-        "id": 1,
-        "pf_url": "http://.../images/user/id/pf_picture.bmp",
-        "name": "이임수",
-        "aboutme": "사용자 자기소개",
-        "flag": false
-      },
-      {
-        "id": 2,
-        "pf_url": "http://.../images/user/id/pf_picture.bmp",
-        "name": "서창욱",
-        "aboutme": "사용자 자기소개",
-        "flag": true
-      },
-      {
-        "id": 3,
-        "pf_url": "http://.../images/user/id/pf_picture.bmp",
-        "name": "임지수",
-        "aboutme": "사용자 자기소개",
-        "flag": false
-      },
-      {
-        "id": 4,
-        "pf_url": "http://.../images/user/id/pf_picture.bmp",
-        "name": "신미은",
-        "aboutme": "사용자 자기소개",
-        "flag": false
-      },
-      {
-        "id": 5,
-        "pf_url": "http://.../images/user/id/pf_picture.bmp",
-        "name": "이혜람",
-        "aboutme": "사용자 자기소개",
-        "flag": true
-      },
-      {
-        "id": 6,
-        "pf_url": "http://.../images/user/id/pf_picture.bmp",
-        "name": "정다솜",
-        "aboutme": "사용자 자기소개",
-        "flag": true
-      },
-      {
-        "id": 7,
-        "pf_url": "http://.../images/user/id/pf_picture.bmp",
-        "name": "김예진",
-        "aboutme": "사용자 자기소개",
-        "flag": true
-      },
-      {
-        "id": 8,
-        "pf_url": "http://.../images/user/id/pf_picture.bmp",
-        "name": "사용자 이름",
-        "aboutme": "사용자 자기소개",
-        "flag": true
-      }
-    ]
+  // 해당 검색어로 사용자 찾는 쿼리
+  var sql = 'select u.id, u.pf_path, u.name, u.aboutme, case when f.user_id_o is not null then 1 else 0 end flag ' +
+            'from user u left join (select user_id_o from follow where user_id = ?) f on (u.id = f.user_id_o) ' + // 팔로우 여부 체크
+            'where u.name like ? and u.id != ? ' + // 검색에서 나를 제외
+            'order by u.name, u.followers desc, u.scrapings desc ' +
+            'limit ?, ?';
+
+  dbPool.getConnection(function(err, conn) {
+    if (err) return callback(err);
+
+    conn.query(sql, [data.uid, data.word, data.uid, data.count * (data.page - 1), data.count], function (err, results) {
+      conn.release();
+      if (err) return callback(err);
+      // 검색 결과를 담을 객체
+      var users = {};
+      users['results'] = [];
+      // 값이 없을 경우 빈 배열
+      if (results.length === 0) return callback(null, users);
+
+      async.each(results, function(item, done) {
+        var pf_url = '';
+        // http로 시작하면 페이스북 사진
+        if(results[0].pf_path.match(/http.+/i)) {
+          pf_url = results[0].pf_path;
+        } else { // 파일에 접근할 url 생성
+          var filename = path.basename(item.pf_path);
+          pf_url = url.resolve(process.env.SERVER_HOST, '/images/profile/' + filename);
+        }
+        users.results.push({
+          id: item.id,
+          pf_url: pf_url,
+          name: item.name,
+          aboutme: item.aboutme,
+          flag: (item.flag === 1) ? true : false
+        });
+        done(null);
+      }, function(err) {
+        if (err) callback(err);
+        callback(null, users);
+      });
+    });
   });
 };
 
+// 태그 검색
 module.exports.findTags = function(data, callback) {
-  callback(null, {
-    "results": [
-      {
-        id: 1,
-        tag: "tag1"
-      },
-      {
-        id: 2,
-        tag: "tag2"
-      },
-      {
-        id: 3,
-        tag: "tag3"
-      },
-      {
-        id: 4,
-        tag: "tag4"
-      },
-      {
-        id: 5,
-        tag: "tag5"
-      },
-    ]
+  // 해당 검색어로 태그 찾는 쿼리
+  var sql = 'select id, tag from hashtag where tag like ?';
+
+  dbPool.getConnection(function(err, conn) {
+    if (err) return callback(err);
+    conn.query(sql, [data.word, data.count * (data.page - 1), data.count], function (err, results) {
+      conn.release();
+      if (err) return callback(err);
+      // 검색 결과를 담을 객체
+      var tags = {};
+      tags['results'] = [];
+      // 값이 없을 경우 빈 배열
+      if (results.length === 0) return callback(null, tags);
+
+      async.each(results, function(item, done) {
+        tags.results.push({
+          id: item.id,
+          tag: item.tag
+        });
+        done(null);
+      }, function(err) {
+        if (err) callback(err);
+        callback(null, tags);
+      });
+    });
   });
 };
 
+// 스크랩 검색
 module.exports.findScraps = function(data, callback) {
-  callback(null, {
-    "results": [
-      {
-        "id" : 1,
-        "title" : "스크랩 제목",
-        "nc_title": "블리자드, '워크래프트' 무기 실제 제작 과정 공개",
-        "nc_img_url" : "http://.../images/newscontents/20160821.bmp",
-        "nc_author": "뉴스 컨텐츠 언론사",
-        "nc_dtime": "2016-08-23 13:22:33",
-        "locked": false,
-        "favorite_cnt" : 1,
-        "favorite": true
-      },
-      {
-        "id" : 2,
-        "title" : "스크랩 제목",
-        "nc_title": "드래곤플라이, '스페셜포스 AR' 테스트 영상 공개",
-        "nc_img_url" : "http://.../images/newscontents/20160821.bmp",
-        "nc_author": "뉴스 컨텐츠 언론사",
-        "nc_dtime": "2016-08-23 13:22:33",
-        "locked": false,
-        "favorite_cnt" : 1,
-        "favorite": false
-      },
-      {
-        "id" : 3,
-        "title" : "스크랩 제목",
-        "nc_title": "블록체인으로 해외송금, 수수료 5분의1로 한 시간 내 OK",
-        "nc_img_url" : "http://.../images/newscontents/20160821.bmp",
-        "nc_author": "뉴스 컨텐츠 언론사",
-        "nc_dtime": "2016-08-23 13:22:33",
-        "locked": false,
-        "favorite_cnt" : 1,
-        "favorite": true
-      },
-      {
-        "id" : 4,
-        "title" : "스크랩 제목",
-        "nc_title": "단통법 개선안 '봇물'... 실현 가능성은?",
-        "nc_img_url" : "http://.../images/newscontents/20160821.bmp",
-        "nc_author": "뉴스 컨텐츠 언론사",
-        "nc_dtime": "2016-08-23 13:22:33",
-        "locked": false,
-        "favorite_cnt" : 1,
-        "favorite": true
-      },
-      {
-        "id" : 5,
-        "title" : "스크랩 제목",
-        "nc_title": "스마트시티, 정부가 앞장서지 마라",
-        "nc_img_url" : "http://.../images/newscontents/20160821.bmp",
-        "nc_author": "뉴스 컨텐츠 언론사",
-        "nc_dtime": "2016-08-23 13:22:33",
-        "locked": false,
-        "favorite_cnt" : 1,
-        "favorite": false
-      },
-      {
-        "id" : 6,
-        "title" : "스크랩 제목",
-        "nc_title": "비타브리드C12, 美 미용 전시회서 트렌드세터상 수상",
-        "nc_img_url" : "http://.../images/newscontents/20160821.bmp",
-        "nc_author": "뉴스 컨텐츠 언론사",
-        "nc_dtime": "2016-08-23 13:22:33",
-        "locked": false,
-        "favorite_cnt" : 1,
-        "favorite": true
-      },
-      {
-        "id" : 7,
-        "title" : "스크랩 제목",
-        "nc_title": "나이키는 왜 골프 장비사업 접었나",
-        "nc_img_url" : "http://.../images/newscontents/20160821.bmp",
-        "nc_author": "뉴스 컨텐츠 언론사",
-        "nc_dtime": "2016-08-23 13:22:33",
-        "locked": false,
-        "favorite_cnt" : 1,
-        "favorite": false
-      },
-      {
-        "id" : 8,
-        "title" : "스크랩 제목",
-        "nc_title": "금융권 클라우드 도입, 핀테크가 이끈다",
-        "nc_img_url" : "http://.../images/newscontents/20160821.bmp",
-        "nc_author": "뉴스 컨텐츠 언론사",
-        "nc_dtime": "2016-08-23 13:22:33",
-        "locked": false,
-        "favorite_cnt" : 1,
-        "favorite": false
-      },
-      {
-        "id" : 9,
-        "title" : "스크랩 제목",
-        "nc_title": "단말기 지원금 상한제, '일몰' 앞당겨야",
-        "nc_img_url" : "http://.../images/newscontents/20160821.bmp",
-        "nc_author": "뉴스 컨텐츠 언론사",
-        "nc_dtime": "2016-08-23 13:22:33",
-        "locked": false,
-        "favorite_cnt" : 1,
-        "favorite": true
-      },
-      {
-        "id" : 10,
-        "title" : "스크랩 제목",
-        "nc_title": "니콘, 신제품 DSLR 'D3400' 내달 출시",
-        "nc_img_url" : "http://.../images/newscontents/20160821.bmp",
-        "nc_author": "뉴스 컨텐츠 언론사",
-        "nc_dtime": "2016-08-23 13:22:33",
-        "locked": false,
-        "favorite_cnt" : 1,
-        "favorite": true
-      }
-    ]
+  // 해당 검색어로 스크랩 찾는 쿼리
+  var sql = 'select s.id, s.title, nc.title nc_title, nc.img_url nc_img_url, nc.author nc_author, nc.ntime nc_ntime, s.favorite_cnt, case when f.scrap_id is not null then 1 else 0 end favorite ' +
+            'from scrap s join news_contents nc on (s.news_contents_id = nc.id) ' +
+                          'join category c on (c.id = s.category_id) ' +
+                          'left join (select scrap_id from favorite where user_id = ?) f on (s.id = f.scrap_id) ' +
+            'where s.title like ? and s.locked = 0 and c.user_id != ? ' +
+            'order by s.dtime desc, nc.id desc, s.id desc ' +
+            'limit ?, ?';
+
+  dbPool.getConnection(function(err, conn) {
+    if (err) return callback(err);
+    conn.query(sql, [data.uid, data.word, data.uid, data.count * (data.page - 1), data.count], function (err, results) {
+      conn.release();
+      if (err) return callback(err);
+      // 검색 결과를 담을 객체
+      var scraps = {};
+      scraps['results'] = [];
+      // 값이 없을 경우 빈 배열
+      if (results.length === 0) return callback(null, scraps);
+
+      async.each(results, function(item, done) {
+        scraps.results.push({
+          id: item.id,
+          title: item.title,
+          nc_title: item.nc_title,
+          nc_img_url: item.nc_img_url,
+          nc_author: item.nc_author,
+          nc_ntime: item.nc_ntime,
+          favorite_cnt: item.favorite_cnt,
+          favorite: (item.favorite === 1) ? true : false
+        });
+        done(null);
+      }, function(err) {
+        if (err) callback(err);
+        callback(null, scraps);
+      });
+    });
   });
 };

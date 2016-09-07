@@ -1,4 +1,4 @@
-var dbPool = require('../models/common').dbPool;
+var dbPool = require('../common/dbpool');
 var fs = require('fs');
 var async = require('async');
 var path = require('path');
@@ -24,7 +24,7 @@ module.exports.findByNameAndProfileUrl = function(id, callback) {
         user.pf_url = results[0].pf_path;
       } else { // 파일에 접근할 url 생성
         var filename = path.basename(results[0].pf_path);
-        user.pf_url = url.resolve(process.env.SERVER_HOST, '/images/' + filename);
+        user.pf_url = url.resolve(process.env.SERVER_HOST, '/images/profile/' + filename);
       }
       callback(null, user);
     });
@@ -53,7 +53,7 @@ module.exports.findUser = function(id, callback) {
         user.pf_url = results[0].pf_path;
       } else { // 파일에 접근할 url 생성
         var filename = path.basename(results[0].pf_path);
-        user.pf_url = url.resolve(process.env.SERVER_HOST, '/images/' + filename);
+        user.pf_url = url.resolve(process.env.SERVER_HOST, '/images/profile/' + filename);
       }
       user.aboutme = results[0].aboutme || ''; // null이 허용된 속성
       user.scrapings = results[0].scrapings;
@@ -95,7 +95,7 @@ module.exports.findOrCreate = function(profile, callback) {
           user.pf_url = results[0].pf_path;
         } else { // 파일에 접근할 url 생성
           var filename = path.basename(results[0].pf_path);
-          user.pf_url = url.resolve(process.env.SERVER_HOST, '/images/' + filename);
+          user.pf_url = url.resolve(process.env.SERVER_HOST, '/images/profile/' + filename);
         }
         user.nt_fs = (results[0].nt_fs === 1) ? true : false;
         user.nt_s = (results[0].nt_s === 1) ? true : false;
@@ -186,15 +186,21 @@ module.exports.updateUser = function(user, callback) {
       var nt_s = user.nt_s || originalUser.nt_s;
       var nt_f = user.nt_f || originalUser.nt_f;
 
-      conn.query(sql_update_user, [name, pf_path, aboutme, nt_fs, nt_s, nt_f, user.id], function(err, result) {
+      conn.query(sql_update_user, [name, pf_path, aboutme, nt_fs, nt_s, nt_f, user.id], function(err) {
         if (err) return next(err);
+        // 삭제할 필요가 없는 경우
+        if (originalUser.pf_path.match(/http.+/i)){
+          return next(null);
+        }
         // 이미지가 넘어왔을 경우 원본 이미지 삭제
         if (user.pf) {
           fs.unlink(originalUser.pf_path, function (err) {
             if (err) return next(err);
+            next(null);
           });
+        } else {
+          next(null);
         }
-        next(null);
       });
     }
   });
@@ -230,16 +236,21 @@ module.exports.listCategory = function(data, callback) {
           'where u.id = ? ' +
           'order by id ' +
           'limit ?, ?';
-  } else if (data.usage === 'profile') { // 마이 페이지에서 보여지는 목록
+  } else if (data.usage === 'profile' && data.me === true) { // 마이 페이지에서 보여지는 목록(나일 때)
     sql = 'select c.id, c.name, c.img_path, c.locked ' +
           'from category c join user u on (u.id = c.user_id) ' +
           'where u.id = ? ' +
           'order by id ' +
           'limit ?, ?';
+  } else if (data.usage === 'profile' && data.me === false) { // 마이 페이지에서 보여지는 목록(타인일 때)
+    sql = 'select c.id, c.name, c.img_path, c.locked ' +
+          'from category c join user u on (u.id = c.user_id) ' +
+          'where u.id = ? and c.locked = 0 ' +
+          'order by id ' +
+          'limit ?, ?';
   } else {
     callback(null, false); // 어느 쪽도 아닌 경우 404
   }
-
   dbPool.getConnection(function(err, conn) {
     if (err) return callback(err);
 
@@ -255,7 +266,7 @@ module.exports.listCategory = function(data, callback) {
             img_url = item.img_path;
           } else {
             var filename = path.basename(item.img_path);
-            img_url = url.resolve(process.env.SERVER_HOST, '/images/' + filename);
+            img_url = url.resolve(process.env.SERVER_HOST, '/images/category/' + filename);
           }
         }
         // 'scrap'일 경우 null값인 img_url, locked는 자동으로 없어진다.
@@ -280,7 +291,7 @@ module.exports.createCategory = function(category, callback) {
 
   dbPool.getConnection(function(err, conn) {
     if (err) return callback(err);
-    conn.query(sql, [category.uid, category.name, category.img, category.locked], function(err, result) {
+    conn.query(sql, [category.uid, category.name, category.img, category.locked], function(err) {
       conn.release();
       if (err) return callback(err);
       callback(null, {
@@ -293,7 +304,7 @@ module.exports.createCategory = function(category, callback) {
 // 카테고리 업데이트
 module.exports.updateCategory = function(category, callback) {
   // 원래 값
-  var sql_select_category = 'select name, img_path, locked ' +
+  var sql_select_category = 'select user_id, name, img_path, locked ' +
                             'from category ' +
                             'where id = ?';
   // 이름, 이미지 경로, 비공개 여부 업데이트
@@ -333,6 +344,8 @@ module.exports.updateCategory = function(category, callback) {
         if (err) return next(err);
         // 결과 값이 없을 경우 404
         if (results.length === 0) return callback(null, false);
+        // 내 카테고리인지 체크, 아니면 403 처리
+        if (results[0].user_id !== category.uid) return callback(null, '403');
         // 원래 값을 넣을 객체
         var originalUser = {};
         originalUser.name = results[0].name;
@@ -349,8 +362,10 @@ module.exports.updateCategory = function(category, callback) {
       var img_path = category.img_path || originalUser.img_path;
       var locked = category.locked || originalUser.locked;
 
-      conn.query(sql_update_category, [name, img_path, locked, category.cid], function(err, result) {
+      conn.query(sql_update_category, [name, img_path, locked, category.cid], function(err) {
         if (err) return next(err);
+        // 삭제할 필요가 없는 경우
+        if (originalUser.img_path === 'default') return next(null);
         // 이미지가 넘어왔을 경우 원본 이미지 삭제
         if (category.img_path) {
           fs.unlink(originalUser.img_path, function (err) {
@@ -364,7 +379,9 @@ module.exports.updateCategory = function(category, callback) {
 };
 
 // 카테고리 삭제
-module.exports.removeCategory = function(id, callback) {
+module.exports.removeCategory = function(cid, uid, callback) {
+  // 카테고리 user_id 찾기
+  var sql_select_category_user_id = 'select user_id from category where id = ?';
   // 해당 카테고리에 스크랩 검색
   var sql_select_scrap = 'select id from scrap where category_id = ?';
   // 검색된 스크랩 id로 favorite 삭제
@@ -390,7 +407,15 @@ module.exports.removeCategory = function(id, callback) {
       }
       // db에서 카테고리 삭제 후 실제 이미지 파일 삭제
       // db는 rollback이 되지만 파일은 안되기 때문에...
-      async.series([findScrapIds, removeFavoriteAndScrapTag, removeScrap, findImagePath, removeCategory, removeImage], function(err) {
+      async.series([
+        checkMyCategory,
+        findScrapIds,
+        removeFavoriteAndScrapTag,
+        removeScrap,
+        findImagePath,
+        removeCategory,
+        removeImage
+      ], function(err) {
         if (err) {
           return conn.rollback(function () {
             conn.release();
@@ -405,10 +430,22 @@ module.exports.removeCategory = function(id, callback) {
         });
       });
     });
+    // 내 카테고리인지 체크
+    function checkMyCategory(next) {
+      conn.query(sql_select_category_user_id, [cid], function(err, results) {
+        if (err) return next(err);
+        // 결과 값이 없을 경우 404
+        if (results.length === 0) return callback(null, false);
+        // 내 카테고리인지 체크, 아니면 403 처리
+        if (results[0].user_id !== uid) return callback(null, '403');
+
+        next(null);
+      });
+    }
     // 스크랩 아이디 검색
     function findScrapIds(next) {
-      conn.query(sql_select_scrap, [id], function(err, results) {
-        if (err) return next(err);
+      conn.query(sql_select_scrap, [cid], function(err, results) {
+        if (err) return next(err+111);
         if (results.length === 0) return next(null);
         async.each(results, function(item, done) {
           scrap_ids.push(item.id);
@@ -422,12 +459,14 @@ module.exports.removeCategory = function(id, callback) {
     // favorite와 scrap_tag 삭제 병렬 처리
     function removeFavoriteAndScrapTag(next) {
       async.parallel([removeFavorite, removeScrapTag], function(err) {
-        if (err) next(err);
+        if (err) return next(err);
         next(null);
       });
     }
     // favorite 삭제
     function removeFavorite(done) {
+      if (scrap_ids.length === 0) return done(null); // 스크랩이 없을 때
+
       conn.query(sql_delete_favorite, [scrap_ids], function(err) {
         if (err) return done(err);
         done(null);
@@ -435,6 +474,8 @@ module.exports.removeCategory = function(id, callback) {
     }
     // scrap_tag 삭제
     function removeScrapTag(done) {
+      if (scrap_ids.length === 0) return done(null); // 스크랩이 없을 때
+
       conn.query(sql_delete_scrap_tag, [scrap_ids], function(err) {
         if (err) return done(err);
         done(null);
@@ -442,14 +483,14 @@ module.exports.removeCategory = function(id, callback) {
     }
     // scrap 삭제
     function removeScrap(next) {
-      conn.query(sql_delete_scrap, [id], function(err) {
+      conn.query(sql_delete_scrap, [cid], function(err) {
         if (err) return next(err);
         next(null);
       });
     }
     // 이미지 path 찾기
     function findImagePath(next) {
-      conn.query(sql_select_category_img, [id], function(err, results) {
+      conn.query(sql_select_category_img, [cid], function(err, results) {
         if (err) return next(err);
         // 결과 값이 없을 경우 404
         if (results.length === 0) return callback(null, false);
@@ -459,7 +500,7 @@ module.exports.removeCategory = function(id, callback) {
     }
     // 카테고리 삭제
     function removeCategory(next) {
-      conn.query(sql_delete_category, [id], function(err, results) {
+      conn.query(sql_delete_category, [cid], function(err) {
         if (err) return next(err);
         next(null);
       });

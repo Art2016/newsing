@@ -3,6 +3,7 @@ var router = express.Router();
 var User = require('../models/user');
 var path = require('path');
 var formidable = require('formidable');
+var logger = require('../common/logger');
 
 // 사용자 조회
 router.get('/:uid', function(req, res, next) {
@@ -45,7 +46,7 @@ router.put('/:uid', function(req, res, next) {
   } else if (action === 'no') {
     // 사용자 정보 변경
     var form = new formidable.IncomingForm();
-    form.uploadDir = path.join(__dirname, '../uploads/images');
+    form.uploadDir = path.join(__dirname, '../uploads/images/profile');
     form.keepExtensions = true;
     form.multiples = false;
     form.parse(req, function(err, fields, files) {
@@ -75,12 +76,20 @@ router.put('/:uid', function(req, res, next) {
 // 카테고리 목록
 router.get('/:uid/categories', function(req, res, next) {
   var uid = '';
+  var me = false; // 비공개 여부에 따른 카테고리 목록을 위한 체크 변수
   // me일 경우 현재 세션의 아이디 사용
-  if (req.params.uid === 'me') uid = req.user.id;
-  else uid = req.params.uid;
+  if (req.params.uid === 'me') {
+    me = true;
+    uid = req.user.id;
+  } else {
+    // 동적 라우팅 파라미터로 내 아이디를 넣었을 경우도 처리
+    me = (req.params.uid === req.user.id) ? true : false;
+    uid = req.params.uid;
+  }
   // date 객체에 매개변수를 담기
   var data = {};
   data.uid = uid;
+  data.me = me;
   data.usage = req.query.usage; // "scrap" or "profile"
   data.page = parseInt(req.query.page) || 1;
   data.count = parseInt(req.query.count) || 20;
@@ -102,7 +111,7 @@ router.post('/:uid/categories', function(req, res, next) {
   var uid = req.user.id;
 
   var form = new formidable.IncomingForm();
-  form.uploadDir = path.join(__dirname, '../uploads/images');
+  form.uploadDir = path.join(__dirname, '../uploads/images/category');
   form.keepExtensions = true;
   form.multiples = false;
   form.parse(req, function(err, fields, files) {
@@ -132,13 +141,14 @@ router.put('/:uid/categories/:cid', function(req, res, next) {
   var cid = parseInt(req.params.cid);
 
   var form = new formidable.IncomingForm();
-  form.uploadDir = path.join(__dirname, '../uploads/images');
+  form.uploadDir = path.join(__dirname, '../uploads/images/category');
   form.keepExtensions = true;
   form.multiples = false;
   form.parse(req, function(err, fields, files) {
     if(err) return next(err);
     // category 객체에 매개변수 담기
     var category = {};
+    category.uid = req.user.id;
     category.cid = cid;
     category.name = fields.name;
     // 파일이 없을 때 오류 방지
@@ -151,6 +161,9 @@ router.put('/:uid/categories/:cid', function(req, res, next) {
       if (!result) return res.status('404').send({
         "error": "카테고리 변경을 실패하였습니다."
       });
+      if (result === '403') return res.status(result).send({
+        "error": "잘못된 접근입니다."
+      });
       res.send(result);
     });
   });
@@ -160,11 +173,15 @@ router.put('/:uid/categories/:cid', function(req, res, next) {
 router.delete('/:uid/categories/:cid', function(req, res, next) {
   if (req.params.uid !== 'me') return next();
   var cid = parseInt(req.params.cid);
+  var uid = req.user.id;
 
-  User.removeCategory(cid, function(err, result) {
+  User.removeCategory(cid, uid, function(err, result) {
     if (err) return next(err);
     if (!result) return res.status('404').send({
       "error": "카테고리 삭제를 실패하였습니다"
+    });
+    if (result === '403') return res.status(result).send({
+      "error": "잘못된 접근입니다."
     });
     res.send(result);
   });

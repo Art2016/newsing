@@ -1,46 +1,29 @@
+var dbPool = require('../common/dbpool');
+var async = require('async');
+
+// 키워드 목록
 module.exports.listKeyword = function(callback) {
-  callback(null, {
-    "results": [
-      {
-        "id": 1,
-        "keyword": "keyword1"
-      },
-      {
-        "id": 2,
-        "keyword": "keyword2"
-      },
-      {
-        "id": 3,
-        "keyword": "keyword3"
-      },
-      {
-        "id": 4,
-        "keyword": "keyword4"
-      },
-      {
-        "id": 5,
-        "keyword": "keyword5"
-      },
-      {
-        "id": 6,
-        "keyword": "keyword6"
-      },
-      {
-        "id": 7,
-        "keyword": "keyword7"
-      },
-      {
-        "id": 8,
-        "keyword": "keyword8"
-      },
-      {
-        "id": 9,
-        "keyword": "keyword9"
-      },
-      {
-        "id": 10,
-        "keyword": "keyword10"
-      },
-    ]
+  var sql = 'select id, word from keyword where ktime >= CURDATE() order by id;';
+
+  dbPool.getConnection(function(err, conn) {
+    if (err) return callback(err);
+    conn.query(sql, [], function (err, results) {
+      conn.release();
+      if (err) return callback(err);
+      var keywords = {};
+      keywords['results'] = [];
+      if (results.length === 0) callback(null, keywords);
+      async.each(results, function(item, done) {
+        keywords.results.push({
+          id: item.id,
+          keyword: item.word
+        });
+
+        done(null);
+      }, function(err) {
+        if (err) return callback(err);
+        callback(null, keywords);
+      });
+    });
   });
 };

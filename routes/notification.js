@@ -1,6 +1,7 @@
 var express = require('express');
 var router = express.Router();
 var Notification = require('../models/notification');
+var logger = require('../common/logger');
 
 router.get('/', function(req ,res, next) {
   var page = req.query.page;

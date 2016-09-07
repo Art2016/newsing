@@ -1,22 +1,23 @@
-var dbPool = require('../models/common').dbPool;
+var dbPool = require('../common/dbpool');
 var async = require('async');
 
 module.exports.listNewscontents = function(callback) {
   // 오늘의 키워드와 해당하는 뉴스 기사를 가져오는 쿼리
   var sql = 'select k.word keyword, nc.id, nc.title, nc.content, nc.img_url, date_format(convert_tz(nc.ntime, "+00:00", "+09:00"), "%Y-%m-%d %H:%i:%s") ntime, nc.author ' +
             'from news_contents nc join keyword k on (k.id = nc.keyword_id) ' +
-            'where k.ktime >= CURDATE()';
+            'where k.ktime >= CURDATE() ' +
+            'order by k.id, nc.ntime desc, nc.id desc';
 
   dbPool.getConnection(function(err, conn) {
     if (err) return callback(err);
     conn.query(sql, [], function (err, results) {
       conn.release();
       if (err) return callback(err);
-      // 결과 값이 없을 경우 404
-      if (results.length === 0) return callback(null, false);
       // 응답으로 보낼 객체
       var nc = {};
       nc["results"] = []; // { results: [] }
+      // 결과 값이 없을 경우 빈 배열
+      if (results.length === 0) return callback(null, nc);
       /*{
         "results": [
           {
@@ -85,10 +86,11 @@ module.exports.findNewscontents = function(id, callback) {
     conn.query(sql, [id], function (err, results) {
       conn.release();
       if (err) return callback(err);
-      // 결과 값이 없을 경우 404
-      if (results.length === 0) return callback(null, false);
       // nc 객체에 결과 값 담기
       var nc = {};
+      // 결과 값이 없을 경우 빈 객체
+      if (results.length === 0) return callback(null, nc);
+
       nc.title = results[0].title;
       nc.content = results[0].content;
       nc.img_url = results[0].img_url || ''; // null이 허용된 속성

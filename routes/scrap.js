@@ -3,9 +3,11 @@ var router = express.Router();
 var Scrap = require('../models/scrap');
 var path = require('path');
 var formidable = require('formidable');
+var logger = require('../common/logger');
 
 // 스크랩 생성
 router.post('/', function(req, res, next) {
+  console.log(req.headers['content-type']);
   // scrap 객체에 매개변수 담기
   var scrap = {};
   scrap.uid = req.user.id;
@@ -41,9 +43,9 @@ router.get('/', function(req ,res, next) {
 
   Scrap.listScrap(data, function(err, results) {
     if (err) return next(err);
-    if (!results) return res.status('404').send({
-      "error": "스크랩 조회에 실패하였습니다."
-    });
+    // if (!results) return res.status('404').send({
+    //   "error": "스크랩 조회에 실패하였습니다."
+    // });
     res.send(results);
   });
 });
@@ -95,8 +97,11 @@ router.get('/:sid', function(req, res, next) {
 
   Scrap.findScrap(sid, uid, function(err, result) {
     if (err) return next(err);
-    if (!result) return res.status('404').send({
-      "error": "해당 스크랩이 없습니다."
+    // if (!result) return res.status('404').send({
+    //   "error": "해당 스크랩이 없습니다."
+    // });
+    if (result === '403') return res.status(result).send({
+      "error": "잘못된 접근입니다."
     });
     res.send({
       result: result

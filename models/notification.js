@@ -1,3 +1,5 @@
+var dbPool = require('../common/dbpool');
+
 module.exports.listNotification = function(page, count, callback) {
   callback(null, {
     "results": [

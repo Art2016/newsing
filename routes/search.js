@@ -1,12 +1,14 @@
 var express = require('express');
 var router = express.Router();
 var Search = require('../models/search');
+var logger = require('../common/logger');
 
 router.get('/', function(req, res, next) {
   var data = {};
-  data.word = req.query.word;
-  data.page = req.query.page;
-  data.count = req.query.count;
+  data.uid = req.user.id;
+  data.word = '%' + req.query.word + '%';
+  data.page = parseInt(req.query.page);
+  data.count = parseInt(req.query.count);
 
   var target = parseInt(req.query.target);
   switch (target) {

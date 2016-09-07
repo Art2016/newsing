@@ -1,4 +1,4 @@
-var dbPool = require('../models/common').dbPool;
+var dbPool = require('../common/dbpool');
 var async = require('async');
 
 // 스크랩 생성
@@ -66,6 +66,7 @@ module.exports.createScrap = function(scrap, callback) {
     });
     // scrap 생성
     function createScrap(done) {
+      //async.series([checkExistCategory, cheackExistNewscontents])
       conn.query(sql_inserte_scrap,
         [scrap.cid, scrap.ncid, scrap.title, scrap.content, scrap.locked],
         function(err, result) {
@@ -116,7 +117,9 @@ module.exports.createScrap = function(scrap, callback) {
 
 // 스크랩 목록
 module.exports.listScrap = function(data, callback) {
-  // 20개의 스크랩을 최신순으로 찾는 쿼리
+  // 해당 category의 user_id
+  var sql_select_category_user_id = 'select user_id from category where id = ?';
+  // 스크랩들을 최신순으로 찾는 쿼리(나일 때)
   var sql_select_scrap = 'select s.id, ' +
                                  's.title, ' +
                                  'nc.title nc_title, ' +
@@ -124,36 +127,62 @@ module.exports.listScrap = function(data, callback) {
                                  'nc.author nc_author, ' +
                                  'date_format(convert_tz(nc.ntime, "+00:00", "+09:00"), "%Y-%m-%d %H:%i:%s") nc_ntime, ' +
                                  'locked, ' +
-                                 'favorite_cnt ' +
+                                 'favorite_cnt, ' +
+                                 'case when f.scrap_id is not null then 1 else 0 end favorite ' +
                          'from scrap s join news_contents nc on (nc.id = s.news_contents_id) ' +
+                                       'left join (select scrap_id from favorite where user_id = ?) f on (s.id = f.scrap_id) ' +
                          'where s.category_id = ? ' +
                          'order by id desc ' +
                          'limit ?, ?';
-  // 좋아요 이모티콘 활성화 여부 검색
-  var sql_select_favorite = 'select * from favorite where user_id = ? and scrap_id = ?';
+  // 스크랩들을 최신순으로 찾는 쿼리(타인일 때)
+  var sql_select_scrap_o = 'select s.id, ' +
+                                 's.title, ' +
+                                 'nc.title nc_title, ' +
+                                 'nc.img_url nc_img_url, ' +
+                                 'nc.author nc_author, ' +
+                                 'date_format(convert_tz(nc.ntime, "+00:00", "+09:00"), "%Y-%m-%d %H:%i:%s") nc_ntime, ' +
+                                 's.locked, ' +
+                                 's.favorite_cnt, ' +
+                                 'case when f.scrap_id is not null then 1 else 0 end favorite ' +
+                         'from scrap s join news_contents nc on (nc.id = s.news_contents_id) ' +
+                                       'left join (select scrap_id from favorite where user_id = ?) f on (s.id = f.scrap_id) ' +
+                         'where s.category_id = ? and s.locked = 0 ' +
+                         'order by id desc ' +
+                         'limit ?, ?';
 
   dbPool.getConnection(function(err, conn) {
     if (err) return callback(err);
-
-    var scraps = {}; // 스크랩 내용을 담을 객체
-    // 스크랩 내용을 검색한 다음 해당 id로 favorite 활성화 여부 검사하여 scraps 객체에 추가
-    async.series([findScrapList, checkFavorite], function(err) {
+    var sql = '';
+    // user_id를 찾아 비교하여 내 스크랩 목록인지 판단
+    // 스크랩 목록 조회
+    async.waterfall([checkMyScrapList, getListScrap], function(err, results) {
       conn.release();
       if (err) return callback(err);
-      callback(null, scraps);
+      callback(null, results);
     });
-    // 스크랩 내용 검색
-    function findScrapList(next) {
-      conn.query(sql_select_scrap, [data.cid, data.count * (data.page - 1), data.count], function(err, results) {
+    // 내 스크랩인지 판단
+    function checkMyScrapList(next) {
+      conn.query(sql_select_category_user_id, [data.cid], function(err, results) {
         if (err) return next(err);
-        // 결과 값이 없을 경우 404
-        if (results.length === 0) {
-          conn.release();
-          return callback(null, false);
-        }
-        // 배열에 검색된 내용을 담기
-        scraps.results = [];
 
+        var scraps = {}; // 스크랩 내용을 담을 객체
+        scraps.results = [];
+        // 결과 값이 없을 경우 빈 배열
+        if (results.length === 0) return callback(null, scraps);
+
+        if (results[0].user_id === data.uid) sql = sql_select_scrap;
+        else sql = sql_select_scrap_o;
+        next(null, sql, scraps);
+      });
+    }
+    // 리스트 목록 얻어오기
+    function getListScrap(sql, scraps, next) {
+      conn.query(sql, [data.uid, data.cid, data.count * (data.page - 1), data.count], function(err, results) {
+        if (err) return callback(err);
+        // 결과 값이 없을 경우 빈 배열
+        if (results.length === 0) return callback(null, scraps);
+
+        // 배열에 검색된 내용을 담기
         async.each(results, function(item, done) {
           scraps.results.push({
             id: item.id,
@@ -163,33 +192,15 @@ module.exports.listScrap = function(data, callback) {
             nc_author: item.nc_author,
             nc_ntime: item.nc_ntime,
             locked: (item.locked === 1) ? true : false,
-            favorite_cnt: item.favorite_cnt
+            favorite_cnt: item.favorite_cnt,
+            favorite: (item.favorite === 1) ? true : false
           });
 
           done(null);
         }, function(err) {
           if (err) return next(err);
-          next(null);
+          next(null, scraps);
         });
-      });
-    }
-    // favorite 활성화 여부 검사
-    function checkFavorite(next) {
-      async.forEachOf(scraps.results, function(scrap, index, done) { // scraps.results에 넣기 위해 index 필요
-        conn.query(sql_select_favorite, [data.uid, scrap.id], function(err, results) {
-          if (err) return done(err);
-          // 검색된 결과가 없으면 false로 비활성화 표시
-          if (results.length === 0) {
-            scraps.results[index].favorite = false;
-          } else { // true는 활성화 표시
-            scraps.results[index].favorite = true;
-          }
-
-          done(null);
-        });
-      }, function(err) {
-        if (err) return next(err);
-        next(null);
       });
     }
   });
@@ -333,7 +344,7 @@ module.exports.updateScrap = function(scrap, callback) {
     function updateScrap(done) {
       conn.query(sql_update_scrap, [scrap.title, scrap.content, scrap.locked, scrap.id], function(err, result) {
           if (err) return done(err);
-          console.log(result);
+          // 해당하는 값이 없을 때
           if (result.affectedRows === 0) {
             return conn.rollback(function() {
               conn.release();
@@ -395,11 +406,14 @@ module.exports.findScrap = function(sid, uid, callback) {
                                  'date_format(convert_tz(nc.ntime, "+00:00", "+09:00"), "%Y-%m-%d %H:%i:%s") nc_ntime, ' +
                                  's.content, ' +
                                  'date_format(convert_tz(s.dtime, "+00:00", "+09:00"), "%Y-%m-%d %H:%i:%s") dtime, ' +
-                                 's.favorite_cnt ' +
+                                 's.favorite_cnt, ' +
+                                 'case when f.scrap_id is not null then 1 else 0 end favorite, ' +
+                                 'c.user_id, ' +
+                                 's.locked ' +
                          'from scrap s join news_contents nc on (s.news_contents_id = nc.id) ' +
+                                       'join category c on (c.id = s.category_id) ' +
+                                       'left join (select scrap_id from favorite where user_id = ?) f on (s.id = f.scrap_id) ' +
                          'where s.id = ?';
-  // 좋아요 이모티콘 활성화 여부 검색
-  var sql_select_favorite = 'select * from favorite where user_id = ? and scrap_id = ?';
   // 스크랩의 태그들 검색
   var sql_select_scrap_tag = 'select h.tag from scrap_tag st join hashtag h on (st.hashtag_id = h.id) where st.scrap_id = ?';
 
@@ -409,19 +423,23 @@ module.exports.findScrap = function(sid, uid, callback) {
     var scraps = {}; // 스크랩 내용을 담을 객체
     // 스크랩 내용을 검색한 다음 해당 id로 favorite 활성화 여부 검사하여 scraps 객체에 추가
     // 그 다음 해당 스크랩의 태그를 검색하여 scraps 객체에 추가
-    async.series([findScrap, checkFavorite, findScrapTag], function(err) {
+    async.series([findScrap, findScrapTag], function(err) {
       conn.release();
       if (err) return callback(err);
       callback(null, scraps);
     });
     // 스크랩 내용 검색
     function findScrap(next) {
-      conn.query(sql_select_scrap, [sid], function(err, results) {
+      conn.query(sql_select_scrap, [uid, sid], function(err, results) {
         if (err) return next(err);
-        // 결과 값이 없을 경우 404
+        // 결과 값이 없을 경우 빈 객체
         if (results.length === 0) {
           conn.release();
-          return callback(null, false);
+          return callback(null, scraps);
+        }
+        if (results[0].locked === 1 && results[0].user_id !== uid) {
+          conn.release();
+          return callback(null, '403');
         }
 
         scraps.title = results[0].title;
@@ -434,20 +452,7 @@ module.exports.findScrap = function(sid, uid, callback) {
         scraps.content = results[0].content;
         scraps.dtime = results[0].dtime;
         scraps.favorite_cnt = results[0].favorite_cnt;
-
-        next(null);
-      });
-    }
-    // favorite 활성화 여부 검사
-    function checkFavorite(next) {
-      conn.query(sql_select_favorite, [uid, sid], function(err, results) {
-        if (err) return next(err);
-        // 검색된 결과가 없으면 false로 비활성화 표시
-        if (results.length === 0) {
-          scraps.favorite = false;
-        } else { // true는 활성화 표시
-          scraps.favorite = true;
-        }
+        scraps.favorite = (results[0].favorite === 1) ? true : false;
 
         next(null);
       });
@@ -506,7 +511,7 @@ module.exports.createFavorite = function(sid, uid, callback) {
     });
     // favorite 생성
     function createFavorite(done) {
-      conn.query(sql_insert_favorite, [uid, sid], function(err, result) {
+      conn.query(sql_insert_favorite, [uid, sid], function(err) {
         if (err) return done(err);
         done(null);
       });

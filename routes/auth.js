@@ -4,6 +4,7 @@ var passport = require('passport');
 var FacebookTokenStrategy = require('passport-facebook-token');
 var User = require('../models/user');
 var isSecure = require('./common').isSecure;
+var logger = require('../common/logger');
 
 // 페이스북 전략
 passport.use(new FacebookTokenStrategy({
