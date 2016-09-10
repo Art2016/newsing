@@ -25,8 +25,8 @@ var app = express();
 //app.use(favicon(path.join(__dirname, 'public', 'favicon.ico')));
 app.use(logger('dev'));
 app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: false }));
-app.use(cookieParser());
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use(cookieParser(process.env.SESSION_SECRET));
 app.use(session({
   secret: process.env.SESSION_SECRET,
   store: new RedisStore({ // redis에 저장
@@ -35,7 +35,13 @@ app.use(session({
     client: redisClient
   }),
   resave: true, // 세션의 변경이 없으면 저장하지 말 것
-  saveUninitialized: false // 저장되는 것이 없으면 세션을 만들지 말 것
+  saveUninitialized: false, // 저장되는 것이 없으면 세션을 만들지 말 것
+  cookie: {
+    path: '/',
+    httpOnly: true,
+    secure: false,
+    maxAge: 1000 * 60 * 60 * 24 * 30 // 30일
+  }
 }));
 app.use(passport.initialize());
 app.use(passport.session());

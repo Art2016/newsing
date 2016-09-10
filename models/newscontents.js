@@ -8,10 +8,12 @@ module.exports.listNewscontents = function(callback) {
             'where k.ktime >= CURDATE() ' +
             'order by k.id, nc.ntime desc, nc.id desc';
 
+  dbPool.logStatus();
   dbPool.getConnection(function(err, conn) {
     if (err) return callback(err);
     conn.query(sql, [], function (err, results) {
       conn.release();
+      dbPool.logStatus();
       if (err) return callback(err);
       // 응답으로 보낼 객체
       var nc = {};
@@ -80,11 +82,13 @@ module.exports.findNewscontents = function(id, callback) {
             'from news_contents ' +
             'where id = ?';
 
+  dbPool.logStatus();
   dbPool.getConnection(function(err, conn) {
     if (err) return callback(err);
 
     conn.query(sql, [id], function (err, results) {
       conn.release();
+      dbPool.logStatus();
       if (err) return callback(err);
       // nc 객체에 결과 값 담기
       var nc = {};

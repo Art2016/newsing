@@ -1,42 +1,35 @@
 var dbPool = require('../common/dbpool');
+var async = require('async');
 
-module.exports.listNotification = function(page, count, callback) {
-  callback(null, {
-    "results": [
-      {
-        "message": "A님이 팔로우하였습니다.",
-        "data_pk": 1,
-        "dtime": "2016-08-22 01:34:15",
-      },
-      {
-        "message": "B님이 내 스크랩을 좋아합니다.",
-        "data_pk": 2,
-        "dtime": "2016-08-22 02:44:25",
-      },
-      {
-        "message": "C님이 팔로우하였습니다.",
-        "data_pk": 3,
-        "dtime": "2016-08-22 05:33:35",
-      },
-      {
-        "message": "D님이 새 스크랩을 올렸습니다.",
-        "data_pk": 4,
-        "dtime": "2016-08-22 07:33:25",
-      },
-      {
-        "message": "E님이 내 스크랩을 좋아합니다.",
-        "data_pk": 5,
-        "dtime": "2016-08-22 09:34:25",
-      },
-    ]
-  })
-};
+module.exports.listNotification = function(uid, page, count, callback) {
+  var sql = 'select type, message, data_pk, date_format(convert_tz(dtime, "+00:00", "+09:00"), "%Y-%m-%d %H:%i:%s") dtime ' +
+            'from notification ' +
+            'where user_id_r = ? ' +
+            'order by dtime desc, id desc ' +
+            'limit ?, ?';
 
-module.exports.createAndPush = function(type, data_pk, ids, callback) {
-  // 메시지 생성
-  // 푸시
-  // 저장
-  callback({
-    "results": "알림을 보내는데 성공하였습니다."
+  dbPool.logStatus();
+  dbPool.getConnection(function(err, conn) {
+    if (err) return callback(err);
+
+    conn.query(sql, [uid, count * (page - 1), count], function(err, results) {
+      conn.release();
+      dbPool.logStatus();
+      if (err) return callback(err);
+      // 값이 없을 경우 빈 배열
+      if (results.length === 0) return callback(null, [])
+
+      async.map(results, function(item, done) {
+        done(null, {
+          type: item.type,
+          message: item.message,
+          data_pk: item.data_pk,
+          dtime: item.dtime
+        });
+      }, function(err, notifications) {
+        if (err) callback(err);
+        callback(null, notifications);
+      });
+    });
   });
 };

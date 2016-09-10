@@ -4,6 +4,10 @@ var Search = require('../models/search');
 var logger = require('../common/logger');
 
 router.get('/', function(req, res, next) {
+  logger.log('debug', 'content-type: %s', req.headers['content-type']);
+  logger.log('debug', '%s %s://%s%s', req.method, req.protocol, req.headers['host'], req.originalUrl);
+  logger.log('debug', 'query: %j', req.query, {});
+
   var data = {};
   data.uid = req.user.id;
   data.word = '%' + req.query.word + '%';

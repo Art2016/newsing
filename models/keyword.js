@@ -5,10 +5,12 @@ var async = require('async');
 module.exports.listKeyword = function(callback) {
   var sql = 'select id, word from keyword where ktime >= CURDATE() order by id;';
 
+  dbPool.logStatus();
   dbPool.getConnection(function(err, conn) {
     if (err) return callback(err);
     conn.query(sql, [], function (err, results) {
       conn.release();
+      dbPool.logStatus();
       if (err) return callback(err);
       var keywords = {};
       keywords['results'] = [];

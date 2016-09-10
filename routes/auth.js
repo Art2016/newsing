@@ -25,7 +25,7 @@ passport.serializeUser(function(user, done) {
 });
 
 passport.deserializeUser(function(id, done) {
-  User.findByNameAndProfileUrl(id, function(err, user) {
+  User.findByNameAndProfileUrlAndNotifications(id, function(err, user) {
     if (err) {
       return done(err);
     }
@@ -34,10 +34,25 @@ passport.deserializeUser(function(id, done) {
 });
 /* ----------------------------------------------------------------------- */
 router.post('/auth/facebook/token', isSecure, passport.authenticate('facebook-token'), function(req, res, next) {
-    res.send(req.user ? { result: req.user } : { error: "로그인에 실패하였습니다." });
+  logger.log('debug', 'content-type: %s', req.headers['content-type']);
+  logger.log('debug', '%s %s://%s%s', req.method, req.protocol, req.headers['host'], req.originalUrl);
+  logger.log('debug', 'query: %j', req.query, {});
+  logger.log('debug', 'registration_token: %s', req.body.registration_token);
+
+  if (!req.user) res.send({ error: "로그인에 실패하였습니다." });
+
+  // fcm 토큰 값 업데이트
+  User.updateToken(req.body.registration_token, req.user.id, function(err) {
+    if (err) return next();
+    res.send({ result: req.user });
+  });
 });
 
 router.get('/logout', function(req, res, next) {
+  logger.log('debug', 'content-type: %s', req.headers['content-type']);
+  logger.log('debug', '%s %s://%s%s', req.method, req.protocol, req.headers['host'], req.originalUrl);
+  logger.log('debug', 'query: %j', req.query, {});
+
   req.logout();
   res.send({ result: "로그아웃하였습니다." });
 });

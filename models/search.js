@@ -12,10 +12,12 @@ module.exports.findNewscontents = function(data, callback) {
             'order by ntime desc, id desc ' +
             'limit ?, ?';
 
+  dbPool.logStatus();
   dbPool.getConnection(function(err, conn) {
     if (err) return callback(err);
     conn.query(sql, [data.word, data.count * (data.page - 1), data.count], function (err, results) {
       conn.release();
+      dbPool.logStatus();
       if (err) return callback(err);
       // 검색 결과를 담을 객체
       var newscontents = {};
@@ -48,11 +50,13 @@ module.exports.findUsers = function(data, callback) {
             'order by u.name, u.followers desc, u.scrapings desc ' +
             'limit ?, ?';
 
+  dbPool.logStatus();
   dbPool.getConnection(function(err, conn) {
     if (err) return callback(err);
 
     conn.query(sql, [data.uid, data.word, data.uid, data.count * (data.page - 1), data.count], function (err, results) {
       conn.release();
+      dbPool.logStatus();
       if (err) return callback(err);
       // 검색 결과를 담을 객체
       var users = {};
@@ -63,8 +67,8 @@ module.exports.findUsers = function(data, callback) {
       async.each(results, function(item, done) {
         var pf_url = '';
         // http로 시작하면 페이스북 사진
-        if(results[0].pf_path.match(/http.+/i)) {
-          pf_url = results[0].pf_path;
+        if(item.pf_path.match(/http.+/i)) {
+          pf_url = item.pf_path;
         } else { // 파일에 접근할 url 생성
           var filename = path.basename(item.pf_path);
           pf_url = url.resolve(process.env.SERVER_HOST, '/images/profile/' + filename);
@@ -90,10 +94,12 @@ module.exports.findTags = function(data, callback) {
   // 해당 검색어로 태그 찾는 쿼리
   var sql = 'select id, tag from hashtag where tag like ?';
 
+  dbPool.logStatus();
   dbPool.getConnection(function(err, conn) {
     if (err) return callback(err);
     conn.query(sql, [data.word, data.count * (data.page - 1), data.count], function (err, results) {
       conn.release();
+      dbPool.logStatus();
       if (err) return callback(err);
       // 검색 결과를 담을 객체
       var tags = {};
@@ -126,10 +132,12 @@ module.exports.findScraps = function(data, callback) {
             'order by s.dtime desc, nc.id desc, s.id desc ' +
             'limit ?, ?';
 
+  dbPool.logStatus();
   dbPool.getConnection(function(err, conn) {
     if (err) return callback(err);
     conn.query(sql, [data.uid, data.word, data.uid, data.count * (data.page - 1), data.count], function (err, results) {
       conn.release();
+      dbPool.logStatus();
       if (err) return callback(err);
       // 검색 결과를 담을 객체
       var scraps = {};

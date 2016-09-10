@@ -4,23 +4,17 @@ var Notification = require('../models/notification');
 var logger = require('../common/logger');
 
 router.get('/', function(req ,res, next) {
-  var page = req.query.page;
-  var count = req.query.count;
+  logger.log('debug', 'content-type: %s', req.headers['content-type']);
+  logger.log('debug', '%s %s://%s%s', req.method, req.protocol, req.headers['host'], req.originalUrl);
+  logger.log('debug', 'query: %j', req.query, {});
 
-  Notification.listNotification(page, count, function(err, results) {
+  var uid = req.user.id;
+  var page = parseInt(req.query.page);
+  var count = parseInt(req.query.count);
+
+  Notification.listNotification(uid, page, count, function(err, results) {
     if (err) return next(err);
-    res.send(results);
-  });
-});
-
-router.post('/', function(req ,res, next) {
-  var type = req.body.type;
-  var data_pk = req.body.data_pk;
-  var ids = req.body.ids;
-
-  Notification.createAndPush(type, data_pk, ids, function(err, result) {
-    if (err) return next(err);
-    res.send(result);
+    res.send({ "results": results });
   });
 });
 
