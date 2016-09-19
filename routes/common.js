@@ -35,8 +35,8 @@ function sendMessage(messageObj, tokens, callback) {
     timeToLive: 3,
     /!*
      data: {
-     key1: 'message1',
-     key2: 'message2'
+       key1: 'message1',
+       key2: 'message2'
      },
      *!/
     notification: {

@@ -14,10 +14,10 @@ router.get('/:uid', function(req, res, next) {
 
   var uid = req.user.id;
   // 자기자신인지 판단
-  var ouid = '';
+  var ouid = 0;
   // me일 경우 현재 세션의 아이디 사용
   if (req.params.uid !== 'me') {
-    ouid = req.params.uid;
+    ouid = parseInt(req.params.uid);
   }
 
   User.findUser(uid, ouid, function(err, result) {
@@ -46,7 +46,7 @@ router.put('/:uid', function(req, res, next) {
   // 사용자 알림 정보 변경
   if (action === 'fs' || action === 's' || action === 'f') {
     var state = req.body.nt_state;
-    if (state !== '1' || state !== '0') return next(); // 1과 0 이외의 값은 404
+    if (state !== '1' && state !== '0') return next(); // 1과 0 이외의 값은 404
 
     var nt = {};
     nt['nt_' + action] = req.body.nt_state; // update set 값에 넣을 객체 생성
@@ -70,11 +70,12 @@ router.put('/:uid', function(req, res, next) {
 
       if(err) return next(err);
       // user 객체에 매개변수를 담기
+      console.log(files.pf);
       var user = {};
-      if (fields.name) user.name = fields.name;
+      if (fields.name) user.name = fields.name.trim();
       if (files.pf) user.pf_path = files.pf.path;
       if (fields.aboutme) user.aboutme = fields.aboutme;
-
+      console.log(user);
       User.updateUser(uid, user, function(err, result) {
         if (err) return next(err);
         if (!result) return res.status('404').send({
@@ -95,16 +96,16 @@ router.get('/:uid/categories', function(req, res, next) {
   logger.log('debug', 'query: %j', req.query, {});
   logger.log('debug', 'uid: %s', req.params.uid);
 
-  var uid = '';
+  var uid = 0;
   var me = false; // 비공개 여부에 따른 카테고리 목록을 위한 체크 변수
   // me일 경우 현재 세션의 아이디 사용
   if (req.params.uid === 'me') {
-    me = true;
     uid = req.user.id;
+    me = true;
   } else {
+    uid = parseInt(req.params.uid);
     // 동적 라우팅 파라미터로 내 아이디를 넣었을 경우도 처리
-    me = (req.params.uid === req.user.id) ? true : false;
-    uid = req.params.uid;
+    me = (uid === req.user.id) ? true : false;
   }
   // date 객체에 매개변수를 담기
   var data = {};
@@ -156,7 +157,7 @@ router.post('/:uid/categories', function(req, res, next) {
     User.createCategory(category, function(err, result) {
       if (err) return next(err);
       if (!result) return res.status('404').send({
-        "error": "카테고리 생성을 실패하였습니다."
+        "error": "이미 존재하는 카테고리 이름입니다."
       });
       res.send(result);
     });

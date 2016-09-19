@@ -57,4 +57,8 @@ router.get('/logout', function(req, res, next) {
   res.send({ result: "로그아웃하였습니다." });
 });
 
+router.get('/', function(req, res, next) {
+  res.send({ result: "로그인" });
+});
+
 module.exports = router;

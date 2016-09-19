@@ -10,6 +10,9 @@ var http = require('http');
 var https = require('https');
 var fs = require('fs');
 var path = require('path');
+var CronJob = require('cron').CronJob;
+var feed = require('../lib/feed-read');
+var Newscontents = require('../models/newscontents');
 
 /**
  * Get port from environment and store in Express.
@@ -36,8 +39,43 @@ var httpsServer = https.createServer(opts, app);
  * Listen on provided port, on all network interfaces.
  */
 
+ var urls = [
+   // 'http://www.zdnet.co.kr/Include2/ZDNetKorea_News.xml',
+   'http://www.fnnews.com/rss/new/fn_realnews_it.xml',
+   'http://media.daum.net/syndication/digital.rss',
+   'http://rss.joins.com/joins_it_list.xml',
+   'http://feeds.feedburner.com/bloter',
+   // 'http://www.inews24.com/rss/news_it.xml',
+   'http://rss.etnews.com/Section031.xml',
+   'http://rss.etnews.com/Section102.xml',
+   'http://rss.etnews.com/Section901.xml',
+   'http://www.itworld.co.kr/rss/feed',
+   'http://www.itcle.com/feed',
+   'http://feeds.feedburner.com/mobiinside/kr',
+   'http://www.econovill.com/rss/S1N18.xml',
+   'http://techholic.co.kr/feed',
+   'http://thegear.co.kr/rss',
+   'http://feeds.feedburner.com/techneedle',
+   // 'http://www.betanews.net/rss/headline.php',
+   'http://it.chosun.com/data/rss/section_373.xml',
+   'http://rss.nocutnews.co.kr/NocutIT.xml',
+   'http://www.khan.co.kr/rss/rssdata/it_news.xml'
+ ];
+
 httpServer.listen(port, function() {
   console.log("HTTP Listening on " + port);
+
+  // 매일 12시에 rss feed
+  new CronJob('00 00 12 * * *', function() {
+    feed(urls, function (err, articles) { // 해당 url을 파싱하여 데이터를 가져옴
+      if (err) return callback(err);
+
+      Newscontents.createNewscontents(articles, function(err, result) {
+        if (err) return console.log(err);
+        console.log(result);
+      });
+    });
+  }, null, true, 'Asia/Seoul');
 });
 httpServer.on('error', onError);
 httpServer.on('listening', onListening);

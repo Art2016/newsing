@@ -39,28 +39,28 @@ module.exports.findByNameAndProfileUrlAndNotifications = function(id, callback) 
 // 사용자 조회
 module.exports.findUser = function(uid, ouid, callback) {
   var sql = '';
-  var values = [];
+  var query_val = [];
 
-  if (ouid === '') {
+  if (ouid === 0) {
     // 이름, 프로필 사진 경로, 자기 소개, 스크랩 수, 팔로잉 수, 팔로워 수
     sql = 'select name, pf_path, aboutme, scrapings, followings, followers ' +
           'from user ' +
           'where id = ?';
-    values.push(uid);
+    query_val.push(uid);
   } else {
     // 타인일 때 팔로우 여부 추가
     sql = 'select name, pf_path, aboutme, scrapings, followings, followers, case when f.user_id_o is not null then 1 else 0 end flag ' +
           'from user u left join (select user_id_o from follow where user_id = ?) f on (u.id = f.user_id_o) ' +
           'where id = ?';
-    values.push(uid);
-    values.push(ouid);
+    query_val.push(uid);
+    query_val.push(ouid);
   }
 
   dbPool.logStatus();
   dbPool.getConnection(function(err, conn) {
     if (err) return callback(err);
 
-    conn.query(sql, values, function (err, results) {
+    conn.query(sql, query_val, function (err, results) {
       conn.release();
       dbPool.logStatus();
       if (err) return callback(err);
@@ -95,10 +95,10 @@ module.exports.findOrCreate = function(profile, callback) {
   // 사용자 조회
   var sql_facebookid = "select id, name, pf_path, nt_fs, nt_s, nt_f " +
                         "from user " +
-                        "where id = ?";
+                        "where facebook_id = ?";
   // 사용자 생성
-  var sql_insert_facebookid = "insert into user(id, name, pf_path) " +
-                               "value (?, ?, ?)";
+  var sql_insert_facebookid = "insert into user(facebook_id, name, pf_path) " +
+                               "values (?, ?, ?)";
 
   dbPool.logStatus();
   dbPool.getConnection(function(err, conn) {
@@ -131,7 +131,7 @@ module.exports.findOrCreate = function(profile, callback) {
         return callback(null, user);
       }
       // 없으면 생성...
-      conn.query(sql_insert_facebookid, [profile.id, profile.displayName, profile.photos[0].value], function(err) {
+      conn.query(sql_insert_facebookid, [profile.id, profile.displayName, profile.photos[0].value], function(err, result) {
         conn.release();
         dbPool.logStatus();
         if (err) {
@@ -139,7 +139,7 @@ module.exports.findOrCreate = function(profile, callback) {
         }
         // 결과 값을 user객체에 담기
         var user = {};
-        user.id = profile.id;
+        user.id = result.insertId;
         user.name = profile.displayName;
         user.pf_url = profile.photos[0].value;
         user.nt_fs = true;
@@ -324,20 +324,41 @@ module.exports.listCategory = function(data, callback) {
 
 // 카테고리 생성
 module.exports.createCategory = function(category, callback) {
+  // 카테고리 검색
+  var sql_select_category = 'select id from category where name = ?';
   // 사용자 아이디, 카테고리 이름, 이미지 경로, 비공개 여부
-  var sql = 'insert into category(user_id, name, img_path, locked) values(?, ?, ?, ?)';
+  var sql_insert_category = 'insert into category(user_id, name, img_path, locked) values(?, ?, ?, ?)';
 
   dbPool.logStatus();
   dbPool.getConnection(function(err, conn) {
     if (err) return callback(err);
-    conn.query(sql, [category.uid, category.name, category.img, category.locked], function(err) {
-      conn.release();
-      dbPool.logStatus();
-      if (err) return callback(err);
+    // 카테고리 이름 중복 검사
+    conn.query(sql_select_category, [category.name], function(err, results) {
+      if (err) {
+        conn.release();
+        dbPool.logStatus();
+        return callback(err);
+      }
+      // 이미 생성된 이미지 삭제 후 callback
+      if (results.length !== 0) {
+        conn.release();
+        dbPool.logStatus();
+        fs.unlink(category.img, function (err) {
+          if (err) return callback(err);
+          callback(null, false);
+        });
+      } else {
+        // 카테고리 생성
+        conn.query(sql_insert_category, [category.uid, category.name, category.img, category.locked], function (err) {
+          conn.release();
+          dbPool.logStatus();
+          if (err) return callback(err);
 
-      callback(null, {
-        "result": "카테고리 생성이 완료되었습니다."
-      });
+          callback(null, {
+            "result": "카테고리 생성이 완료되었습니다."
+          });
+        });
+      }
     });
   });
 };
@@ -438,6 +459,8 @@ module.exports.removeCategory = function(cid, uid, callback) {
   var sql_delete_scrap_tag = 'delete from scrap_tag where scrap_id in (?)';
   // 스크랩 삭제
   var sql_delete_scrap = 'delete from scrap where category_id = ?';
+  // 스크랩 삭제 시 사용자의 스크랩 수 1 감소
+  var sql_update_scrapings = 'update user set scrapings = scrapings - ? where id = ?';
   // 삭제 전 이미지 경로를 찾는 쿼리
   var sql_select_category_img = 'select img_path from category where id = ?';
   // 카테고리 삭제하는 쿼리
@@ -462,6 +485,7 @@ module.exports.removeCategory = function(cid, uid, callback) {
         findScrapIds,
         removeFavoriteAndScrapTag,
         removeScrap,
+        decreaseScrapins,
         findImagePath,
         removeCategory,
         removeImage
@@ -509,7 +533,7 @@ module.exports.removeCategory = function(cid, uid, callback) {
     // 스크랩 아이디 검색
     function findScrapIds(next) {
       conn.query(sql_select_scrap, [cid], function(err, results) {
-        if (err) return next(err+111);
+        if (err) return next(err);
         if (results.length === 0) return next(null);
         async.each(results, function(item, done) {
           scrap_ids.push(item.id);
@@ -548,6 +572,13 @@ module.exports.removeCategory = function(cid, uid, callback) {
     // scrap 삭제
     function removeScrap(next) {
       conn.query(sql_delete_scrap, [cid], function(err) {
+        if (err) return next(err);
+        next(null);
+      });
+    }
+    // scrapings 감소
+    function decreaseScrapins(next) {
+      conn.query(sql_update_scrapings, [scrap_ids.length, uid], function(err) {
         if (err) return next(err);
         next(null);
       });

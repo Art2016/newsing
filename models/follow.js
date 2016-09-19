@@ -11,21 +11,23 @@ module.exports.listFollow = function(data, callback) {
   if (data.direction === 'to') {
     sql = 'select u.id, u.pf_path, u.name, u.aboutme ' +
           'from follow f join user u on (f.user_id_o = u.id) ' +
-          'where user_id = ? ' +
+          'where f.user_id = ? and u.name like ? ' +
           'limit ?, ?';
 
     query_val.push(data.id);
+    query_val.push(data.word);
     query_val.push(data.count * (data.page - 1));
     query_val.push(data.count);
   } else if (data.direction === 'from') {
     sql = 'select u.id, u.pf_path, u.name, u.aboutme, case when of.user_id_o is not null then 1 else 0 end flag ' +
           'from follow f join user u on (f.user_id = u.id) ' +
                          'left join (select user_id_o from follow where user_id = ?) of on (of.user_id_o = f.user_id) ' +
-          'where f.user_id_o = ? ' +
+          'where f.user_id_o = ? and u.name like ? ' +
           'limit ?, ?';
 
     query_val.push(data.id);
     query_val.push(data.id);
+    query_val.push(data.word);
     query_val.push(data.count * (data.page - 1));
     query_val.push(data.count);
   }
@@ -54,7 +56,7 @@ module.exports.listFollow = function(data, callback) {
           pf_url = url.resolve(process.env.SERVER_HOST, '/images/profile/' + filename);
         }
 
-        var flag = item.flag || 1; // 팔로잉일 경우 flag가 없음
+        var flag = (item.flag === undefined) ? 1 : item.flag; // 팔로잉일 경우 flag가 없음
         follows.results.push({
           id: item.id,
           pf_url: pf_url,
@@ -80,7 +82,7 @@ module.exports.createFollow = function(id, id_o, name, callback) {
   // 팔로워 +1 증가
   var sql_update_followers = 'update user set followers = followers + 1 where id = ?';
   // 팔로우한 상대의 토큰 값 가져오기
-  var sql_select_user_fcm_token = 'select fcm_token from user where id = ?';
+  var sql_select_user_fcm_token = 'select nt_f, fcm_token from user where id = ?';
   // 알림내역 생성
   var sql_insert_notification = 'insert into notification(user_id_s, user_id_r, type, message, data_pk) values(?, ?, ?, ?, ?)';
 
@@ -132,7 +134,8 @@ module.exports.createFollow = function(id, id_o, name, callback) {
                 body: name + "님이 나를 팔로우하였습니다."
               }
             };
-            msgData.tokens = [results[0].fcm_token];
+            // 알림 설정에 따른 토큰 추가
+            if (results[0].nt_f === 1) msgData.tokens = [results[0].fcm_token];
 
             next(null, msgData);
           });
@@ -221,14 +224,14 @@ module.exports.removeFollow = function(id, id_o, callback) {
         done(null);
       });
     }
-    // 팔로잉 -1 증가
+    // 팔로잉 -1 감소
     function decreaseFollowings(done) {
       conn.query(sql_update_followins, [id], function (err) {
         if (err) return done(err);
         done(null);
       });
     }
-    // 팔로워 -1 증가
+    // 팔로워 -1 감소
     function decreaseFollowers(done) {
       conn.query(sql_update_followers, [id_o], function (err) {
         if (err) return done(err);

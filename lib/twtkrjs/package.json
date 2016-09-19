@@ -1,0 +1,27 @@
+{
+  "name": "twtkrjs",
+  "version": "0.0.1",
+  "description": "node.js interface twitter-korean-text",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ch0p/twtkrjs.git"
+  },
+  "keywords": [
+    "twitter-korean-text"
+  ],
+  "author": "Ch0p (difgrt@gmail.com)",
+  "license": "Apache License 2.0",
+  "bugs": {
+    "url": "https://github.com/ch0p/twtkrjs/issues"
+  },
+  "homepage": "https://github.com/ch0p/twtkrjs#readme",
+  "dependencies": {
+    "async": "^0.9.0",
+    "deasync": "^0.1.4",
+    "java": "^0.6.0"
+  }
+}

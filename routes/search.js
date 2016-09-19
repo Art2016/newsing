@@ -10,7 +10,7 @@ router.get('/', function(req, res, next) {
 
   var data = {};
   data.uid = req.user.id;
-  data.word = '%' + req.query.word + '%';
+  data.word = '%' + req.query.word.trim() + '%';
   data.page = parseInt(req.query.page);
   data.count = parseInt(req.query.count);
 

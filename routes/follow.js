@@ -14,8 +14,9 @@ router.get('/', function(req ,res, next) {
   data.id = req.user.id;
   data.direction = req.query.direction;
   if (data.direction !== 'to' && data.direction !== 'from') return next(); // 잘못된 경로일 경우
-  data.page = parseInt(req.query.page);
-  data.count = parseInt(req.query.count);
+  data.word = (!req.query.word) ? '%' : '%' + req.query.word.trim() + '%';
+  data.page = parseInt(req.query.page) || 1;
+  data.count = parseInt(req.query.count) || 20;
 
   Follow.listFollow(data, function(err, results) {
     if (err) return next(err);
@@ -31,7 +32,8 @@ router.post('/', function(req, res, next) {
   logger.log('debug', 'body: %j', req.body, {});
 
   var id = req.user.id;
-  var id_o = req.body.ofid;
+  var id_o = parseInt(req.body.ofid);
+  if (id === id_o) return res.status('403').send({ "error": "자기 자신을 팔로우할 수 없습니다." });
   var name = req.user.name;
 
   Follow.createFollow(id, id_o, name, function(err, result) {
@@ -39,13 +41,12 @@ router.post('/', function(req, res, next) {
       return (err.errno === 1062) ? res.status('404').send({ "error": err.message }) // Duplicate
       : (err.errno === 1452) ? res.status('404').send({ "error": err.message }) : next(err); // foreign key constraint fails
     }
-    // 알림 설정이 true일 때
-    if (req.user.nt_f === 1) {
-      sendMessage(result.messageObj, result.tokens, function(err, response) {
-        if (err) return logger.log('error', 'ERROR: %j', err, {});
-        logger.log('info', 'FCM send info: %j', response, {});
-      });
-    }
+
+    // 알림 보내기
+    sendMessage(result.messageObj, result.tokens, function(err, response) {
+      if (err) return logger.log('error', 'ERROR: %j', err, {});
+      logger.log('info', 'FCM send info: %j', response, {});
+    });
 
     res.send({ "results": "팔로우를 하였습니다." });
   });
@@ -59,7 +60,7 @@ router.delete('/:ofid', function(req, res, next) {
   logger.log('debug', 'ofid: %s', req.params.ofid);
 
   var id = req.user.id;
-  var id_o = req.params.ofid;
+  var id_o = parseInt(req.params.ofid);
 
   Follow.removeFollow(id, id_o, function(err, result) {
     if (err) return next(err);

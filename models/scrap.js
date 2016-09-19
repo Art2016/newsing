@@ -17,7 +17,7 @@ module.exports.createScrap = function(scrap, callback) {
   // 스크랩 생성 시 사용자의 스크랩 수 1 증가
   var sql_update_scrapings = 'update user set scrapings = scrapings + 1 where id = ?';
   // 팔로워들의 토큰 값 가져오기
-  var sql_select_user_fcm_token = 'select id, fcm_token from follow f join user u on (f.user_id = u.id) where user_id_o = ?';
+  var sql_select_user_fcm_token = 'select id, nt_fs, fcm_token from follow f join user u on (f.user_id = u.id) where user_id_o = ?';
   // 알림내역 생성
   var sql_insert_notification = 'insert into notification(user_id_s, user_id_r, type, message, data_pk) values(?, ?, ?, ?, ?)';
 
@@ -108,6 +108,7 @@ module.exports.createScrap = function(scrap, callback) {
             async.map(results, function(item, done) {
               done(null, {
                 ids: item.id,
+                nt_fs: item.nt_fs,
                 fcm_tokens: item.fcm_token
               });
             }, function(err, data) {
@@ -128,7 +129,8 @@ module.exports.createScrap = function(scrap, callback) {
 
               async.each(data, function(item, indone) { // 객체배열을 나누어 배열에 담기
                 ids.push(item.ids);
-                msgData.tokens.push(item.fcm_tokens);
+                // 알림 설정에 따라 토큰 추가
+                if (item.nt_fs === 1) msgData.tokens.push(item.fcm_tokens);
 
                 indone(null);
               }, function(err) {
@@ -578,7 +580,7 @@ module.exports.findScrap = function(sid, uid, callback) {
                                  'case when f.scrap_id is not null then 1 else 0 end favorite, ' +
                                  'c.user_id, ' +
                                  's.locked slocked, ' +
-                                 'c.locked clocked,'
+                                 'c.locked clocked ' +
                          'from scrap s join news_contents nc on (s.news_contents_id = nc.id) ' +
                                        'join category c on (c.id = s.category_id) ' +
                                        'left join (select scrap_id from favorite where user_id = ?) f on (s.id = f.scrap_id) ' +
@@ -706,7 +708,7 @@ module.exports.createFavorite = function(sid, uid, uname, callback) {
   // "좋아요" 카운트 증가
   var sql_update_favorite_cnt = 'update scrap set favorite_cnt = favorite_cnt + 1 where id = ?';
   // 스크랩 작성자의 토큰 값 가져오기
-  var sql_select_user_fcm_token = 'select u.id, u.fcm_token ' +
+  var sql_select_user_fcm_token = 'select u.id, u.nt_s, u.fcm_token ' +
                                   'from scrap s join category c on (c.id = s.category_id) ' +
                                                 'join user u on (c.user_id = u.id) ' +
                                   'where s.id = ?';
@@ -762,7 +764,8 @@ module.exports.createFavorite = function(sid, uid, uname, callback) {
                 body: uname + "님이 내 스크랩에 '좋아요'를 눌렀습니다."
               }
             };
-            msgData.tokens = [results[0].fcm_token];
+            // 알림 설정에 따른 토큰 추가
+            if (results[0].nt_s === 1) msgData.tokens = [results[0].fcm_token];
 
             next(null, msgData, results[0].id);
           });

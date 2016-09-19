@@ -17,7 +17,7 @@ module.exports.listNotification = function(uid, page, count, callback) {
       dbPool.logStatus();
       if (err) return callback(err);
       // 값이 없을 경우 빈 배열
-      if (results.length === 0) return callback(null, [])
+      if (results.length === 0) return callback(null, []);
 
       async.map(results, function(item, done) {
         done(null, {

@@ -92,12 +92,18 @@ module.exports.findUsers = function(data, callback) {
 // 태그 검색
 module.exports.findTags = function(data, callback) {
   // 해당 검색어로 태그 찾는 쿼리
-  var sql = 'select id, tag from hashtag where tag like ?';
+  var sql = 'select h.id, h.tag, count(*) scrap_count ' +
+            'from hashtag h join scrap_tag st on (h.id = st.hashtag_id) ' +
+                            'join scrap s on (st.scrap_id = s.id) ' +
+                            'join category c on (s.category_id = c.id) ' +
+            'where tag like ? and c.locked = 0 and s.locked = 0 and c.user_id != ? ' +
+            'group by h.tag ' +
+            'limit ?, ?';
 
   dbPool.logStatus();
   dbPool.getConnection(function(err, conn) {
     if (err) return callback(err);
-    conn.query(sql, [data.word, data.count * (data.page - 1), data.count], function (err, results) {
+    conn.query(sql, [data.word, data.uid, data.count * (data.page - 1), data.count], function (err, results) {
       conn.release();
       dbPool.logStatus();
       if (err) return callback(err);
@@ -110,7 +116,8 @@ module.exports.findTags = function(data, callback) {
       async.each(results, function(item, done) {
         tags.results.push({
           id: item.id,
-          tag: item.tag
+          tag: item.tag,
+          scrap_count: item.scrap_count
         });
         done(null);
       }, function(err) {
@@ -128,7 +135,7 @@ module.exports.findScraps = function(data, callback) {
             'from scrap s join news_contents nc on (s.news_contents_id = nc.id) ' +
                           'join category c on (c.id = s.category_id) ' +
                           'left join (select scrap_id from favorite where user_id = ?) f on (s.id = f.scrap_id) ' +
-            'where s.title like ? and s.locked = 0 and c.user_id != ? ' +
+            'where s.title like ? and c.locked = 0 and s.locked = 0 and c.user_id != ? ' +
             'order by s.dtime desc, nc.id desc, s.id desc ' +
             'limit ?, ?';
 

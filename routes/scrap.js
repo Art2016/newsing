@@ -47,13 +47,13 @@ router.post('/', function(req, res, next) {
         "error": "잘못된 접근입니다."
       });
     }
-    // 알림 설정이 true일 때
-    if(req.user.nt_fs === 1 && scrap.locked === '0') {
-      sendMessage(result.messageObj, result.tokens, function(err, response) {
-        if (err) return logger.log('error', 'ERROR: %j', err, {});
-        logger.log('info', 'FCM send info: %j', response, {});
-      });
-    }
+
+    // 알림 보내기
+    sendMessage(result.messageObj, result.tokens, function(err, response) {
+      if (err) return logger.log('error', 'ERROR: %j', err, {});
+      logger.log('info', 'FCM send info: %j', response, {});
+    });
+
     res.send({ "result": "스크랩을 완료하였습니다." });
   });
 });
@@ -114,7 +114,7 @@ router.put('/:sid', function(req, res, next) {
 
   if (action === 'udscrap') {
     var data = {};
-    if (req.body.title) data.title = req.body.title;
+    if (req.body.title) data.title = req.body.title.trim();
     if (req.body.content) data.content = req.body.content;
     if (req.body.locked) data.locked = req.body.locked;
     scrap.data = data;
@@ -138,7 +138,7 @@ router.put('/:sid', function(req, res, next) {
     });
   } else if (action === 'mvcategory') {
     var uid = req.user.id;
-    var cid = req.body.cid;
+    var cid = parseInt(req.body.cid);
 
     Scrap.moveCategory(scrap.id, cid, uid, function(err, result) {
       if (err) return next(err);
@@ -188,13 +188,12 @@ router.post('/:sid/favorites', function(req, res, next) {
       return (err.errno === 1062) ? res.status('404').send({ "error": err.message }) // Duplicate
       : (err.errno === 1452) ? res.status('404').send({ "error": err.message }) : next(err); // foreign key constraint fails
     }
-    // 알림 설정이 true일 때
-    if (req.user.nt_s === 1) {
-      sendMessage(result.messageObj, result.tokens, function(err, response) {
-        if (err) return logger.log('error', 'ERROR: %j', err, {});
-        logger.log('info', 'FCM send info: %j', response, {});
-      });
-    }
+
+    // 알림 보내기
+    sendMessage(result.messageObj, result.tokens, function(err, response) {
+      if (err) return logger.log('error', 'FCM ERROR: %j', err, {});
+      logger.log('info', 'FCM send info: %j', response, {});
+    });
 
     res.send({ "result": "'좋아요' 이모티콘이 활성화되었습니다." });
   });

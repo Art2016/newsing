@@ -45,6 +45,7 @@ app.use(session({
 }));
 app.use(passport.initialize());
 app.use(passport.session());
+
 // 로그인해야 서비스 사용가능하도록 설정
 app.use(require('./routes/common').isAuthenticated);
 app.use(express.static(path.join(__dirname, 'public')));
